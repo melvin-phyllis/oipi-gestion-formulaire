@@ -1,0 +1,537 @@
+# Architecture cible de RISFM
+
+## 1. Objet
+
+Ce document définit l’architecture du nouveau RISFM Laravel de l’OIPI. Il est la référence pour l’organisation du backend, les conventions de nommage, la sécurité, la base de données et les traitements automatiques.
+
+RISFM est un monolithe Laravel rendu côté serveur avec Blade et Tabler. Il ne nécessite actuellement ni API versionnée, ni JWT, ni frontend séparé.
+
+> La documentation, l’interface et les messages visibles peuvent être en français. Tous les identifiants techniques sont en anglais : dossiers, namespaces, classes, méthodes, variables, routes, tables, colonnes, événements, statuts internes et permissions.
+
+## 2. Socle technique
+
+- PHP 8.3 ;
+- version de Laravel définie par le `composer.lock` du projet ;
+- Blade et Tabler compilé localement avec Vite, sans CDN ;
+- authentification par session Laravel et protection CSRF ;
+- MySQL ou MariaDB ;
+- PHPUnit ;
+- queue Laravel pour les tâches asynchrones ;
+- scheduler Laravel pour les rappels, rapports et sauvegardes.
+
+Les versions installées doivent toujours être vérifiées dans `composer.lock` et `package-lock.json`. Les versions d’un autre projet ne sont jamais reprises par supposition.
+
+## 3. Décision d’architecture
+
+Le code est organisé d’abord par couche technique, puis par domaine métier. Cette organisation reprend la séparation éprouvée de l’ERP OIPI tout en l’adaptant à une application Blade monolithique.
+
+```text
+FormRequest
+    ↓
+Controller (ctrl_*)
+    ↓
+Service (srv_*)
+    ↓
+DTO
+    ↓
+Repository interface / implementation (repo_*)
+    ↓
+Eloquent Model
+    ↓
+Database
+```
+
+Le contrôleur traduit le protocole HTTP. Le service exécute le cas d’utilisation. Le repository est l’unique frontière des requêtes de persistance. Le modèle décrit la donnée et ses relations.
+
+Les structures suivantes ne sont pas utilisées pour les fonctionnalités ordinaires :
+
+```text
+app/Features/
+app/Core/
+app/Shared/
+app/Http/Controllers/API/V1/
+```
+
+Une API versionnée ne sera créée que lorsqu’un véritable client externe ou mobile devra consommer RISFM.
+
+## 4. Arborescence cible
+
+```text
+app/
+├── Console/Commands/
+├── Constants/
+├── Dto/
+│   ├── Administration/
+│   ├── Organization/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Analytics/
+│   ├── Audit/
+│   └── Backup/
+├── Enums/
+├── Events/
+│   ├── Administration/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Security/
+│   └── Backup/
+├── Exceptions/
+├── Http/
+│   ├── Controllers/
+│   │   ├── Authentication/
+│   │   ├── Administration/
+│   │   ├── Organization/
+│   │   ├── Registry/
+│   │   ├── Mission/
+│   │   ├── Analytics/
+│   │   ├── Audit/
+│   │   └── Backup/
+│   ├── Middleware/
+│   └── Requests/
+│       ├── Authentication/
+│       ├── Administration/
+│       ├── Organization/
+│       ├── Registry/
+│       ├── Mission/
+│       ├── Analytics/
+│       ├── Audit/
+│       └── Backup/
+├── Jobs/
+│   ├── Mission/
+│   ├── Analytics/
+│   ├── Notification/
+│   └── Backup/
+├── Listeners/
+│   ├── Administration/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Security/
+│   └── Backup/
+├── Models/
+│   ├── Administration/
+│   ├── Organization/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Audit/
+│   └── Backup/
+├── Notifications/
+├── Observers/
+│   ├── Administration/
+│   ├── Registry/
+│   ├── Mission/
+│   └── Audit/
+├── Policies/
+├── Providers/RepositoryServiceProvider.php
+├── Repositories/
+│   ├── Interfaces/
+│   │   ├── Administration/
+│   │   ├── Organization/
+│   │   ├── Registry/
+│   │   ├── Mission/
+│   │   ├── Analytics/
+│   │   ├── Audit/
+│   │   └── Backup/
+│   ├── Administration/
+│   ├── Organization/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Analytics/
+│   ├── Audit/
+│   └── Backup/
+├── Services/
+│   ├── Authentication/
+│   ├── Administration/
+│   ├── Organization/
+│   ├── Registry/
+│   ├── Mission/
+│   ├── Analytics/
+│   ├── Audit/
+│   ├── Backup/
+│   ├── CodeGenerator/
+│   ├── CustomLog/
+│   └── UploadFileManager/
+└── Traits/
+    ├── HasUniqueCode.php
+    └── HasUuid.php
+
+database/{factories,migrations,seeders}/
+resources/{css,js,lang/fr,views}/
+tests/{Feature,Integration,Unit}/
+
+routes/
+├── web.php
+├── console.php
+├── authentication.php
+├── administration.php
+├── organization.php
+├── registry.php
+├── mission.php
+├── analytics.php
+├── audit.php
+└── backup.php
+```
+
+Les dossiers sont créés au moment où un premier élément réel en a besoin. Aucun répertoire vide n’est ajouté uniquement pour reproduire l’arbre.
+
+## 5. Domaines métier
+
+### `Authentication`
+
+Connexion, déconnexion, récupération et changement de mot de passe, sessions, limitation des tentatives et réauthentification des opérations sensibles.
+
+### `Administration`
+
+Utilisateurs, rôles, modules, permissions, paramètres fonctionnels, activation et désactivation des comptes.
+
+### `Organization`
+
+Directions, services rattachés aux directions et rattachement organisationnel des utilisateurs.
+
+### `Registry`
+
+Registre des formulaires manquants, types de titre, statuts, historique, pièces jointes, archivage et parcours `found -> digitized -> entered`.
+
+### `Mission`
+
+Affectation, réaffectation, échéance, démarrage, annulation, compte rendu, résultat, clôture et rappels automatiques.
+
+### `Analytics`
+
+Tableau de bord, statistiques avancées, exports et rapports périodiques.
+
+### `Audit`
+
+Journal d’activité, connexions, échecs de connexion, traçabilité des opérations sensibles et consultation autorisée des traces.
+
+### `Backup`
+
+Création, conservation, téléchargement autorisé, restauration contrôlée et planification des sauvegardes.
+
+## 6. Responsabilités des couches
+
+### FormRequest
+
+- autorise explicitement l’action ;
+- normalise les entrées simples ;
+- valide les données HTTP ;
+- fournit des messages français ;
+- ne décide pas d’une transition métier dépendante de l’état courant.
+
+Toute écriture possède un `FormRequest` et produit un DTO.
+
+### Controller
+
+- méthodes publiques préfixées `ctrl_` ;
+- reçoit des données validées ou une ressource liée par route ;
+- appelle les services ;
+- retourne une `View`, une `RedirectResponse` ou exceptionnellement une `JsonResponse` ;
+- ne contient ni requête Eloquent, ni transaction, ni logique métier.
+
+### Service
+
+- méthodes publiques préfixées `srv_` ;
+- applique les règles métier ;
+- coordonne plusieurs repositories ;
+- gère transactions et verrous ;
+- diffuse les événements lorsque l’état est validé ;
+- ne dépend jamais de `Request`, Blade, `View` ou `RedirectResponse`.
+
+### DTO
+
+- classe immuable suffixée `DTO` ;
+- contient uniquement des données validées et typées ;
+- ne connaît ni HTTP ni Eloquent ;
+- sert de contrat stable entre contrôleur, service et repository.
+
+### Repository
+
+- interface suffixée `RepositoryInterface` ;
+- implémentation suffixée `Repository` ;
+- méthodes publiques préfixées `repo_` ;
+- centralise Eloquent, filtres, agrégations, pagination et verrouillage ;
+- ne contient ni autorisation ni choix de transition métier ;
+- est injecté par son interface via `RepositoryServiceProvider`.
+
+### Model
+
+- classe suffixée `Model` ;
+- déclare table, casts, relations et scopes ;
+- peut exposer un petit prédicat d’état ;
+- ne coordonne jamais un workflow métier.
+
+## 7. Contrat HTTP Blade
+
+Toutes les routes utilisateur utilisent le middleware `web`, les sessions, les cookies sécurisés, CSRF, l’authentification et des noms de route stables.
+
+```php
+Route::middleware(['auth', 'permission:missions_assign'])
+    ->prefix('missions')
+    ->name('missions.')
+    ->group(function (): void {
+        Route::post('{missionUuid}/assign', [MissionController::class, 'ctrl_assign'])
+            ->whereUuid('missionUuid')
+            ->name('assign');
+    });
+```
+
+Les fichiers de routes sont séparés par domaine et chargés depuis `bootstrap/app.php`. Le contrôleur possède la réponse HTTP ; le service ne retourne jamais du JSON ou une redirection.
+
+## 8. Modèle de données
+
+### Préfixes
+
+| Domaine | Préfixe |
+|---|---|
+| Administration | `adm_` |
+| Organization | `org_` |
+| Registry | `reg_` |
+| Mission | `mis_` |
+| Audit | `aud_` |
+| Backup | `bkp_` |
+
+Les tables métier suivent `{prefix}_{entity}_models`.
+
+### Tables principales prévues
+
+```text
+adm_user_models
+adm_role_models
+adm_permission_models
+adm_module_primary_models
+adm_module_secondary_models
+adm_module_secondary_permission_models
+adm_setting_models
+
+org_directorate_models
+org_service_models
+
+reg_title_type_models
+reg_form_status_models
+reg_missing_form_models
+reg_form_attachment_models
+reg_form_status_history_models
+
+mis_search_mission_models
+mis_mission_report_models
+mis_mission_history_models
+
+aud_activity_log_models
+aud_login_log_models
+
+bkp_backup_models
+```
+
+### Identifiants et relations
+
+Chaque modèle métier contient normalement :
+
+```text
+id              internal numeric identifier
+uuid            public identifier used in URLs
+code_unique     stable business identifier
+created_at
+updated_at
+deleted_at
+```
+
+Les relations utilisent des colonnes `*_code_unique` immuables, indexées et protégées par une clé étrangère lorsque le moteur le permet. Les identifiants numériques ne sont jamais exposés dans les URL.
+
+Les exceptions à `uuid`, `code_unique` ou `SoftDeletes` sont limitées aux tables purement techniques et doivent être justifiées dans la migration.
+
+## 9. Rôles et permissions
+
+La matrice d’accès suit cette hiérarchie :
+
+```text
+Role
+  └── Primary module
+       └── Secondary module
+            └── Permission
+```
+
+Exemples de permissions :
+
+```text
+registry_view
+registry_create
+registry_update
+registry_archive
+missions_view
+missions_assign
+missions_report
+missions_cancel
+analytics_view
+analytics_export
+users_manage
+backups_create
+backups_restore
+audit_view
+```
+
+La sécurité est fermée par défaut :
+
+- une route protégée déclare explicitement sa permission ;
+- une permission absente ou inconnue refuse l’accès ;
+- aucune autorisation n’est déduite du nom du contrôleur ou de sa méthode ;
+- une policy complète la permission pour vérifier la ressource, son propriétaire ou son état ;
+- le middleware ne laisse jamais passer une action parce qu’un code de module manque ;
+- les actions publiques sont énumérées explicitement.
+
+## 10. Événements, listeners, jobs et observers
+
+### Événements
+
+Ils décrivent un fait métier déjà produit :
+
+```text
+MissingFormCreated
+MissingFormUpdated
+MissingFormArchived
+FormStatusChanged
+MissionAssigned
+MissionReassigned
+MissionStarted
+MissionReportSubmitted
+MissionCompleted
+MissionCancelled
+PasswordChanged
+BackupCreated
+BackupRestored
+```
+
+Un événement ne contient aucune logique métier. Il transporte de préférence des identifiants stables.
+
+### Listeners
+
+Ils exécutent des conséquences indépendantes : historique, notification, audit ou mise en queue. Un listener lent délègue à un job.
+
+### Jobs
+
+```text
+SendMissionReminder
+GeneratePeriodicReport
+GenerateRegistryExport
+CreateDatabaseBackup
+PruneOldAuditEntries
+```
+
+Un job rejouable doit être idempotent et définir une stratégie explicite de tentative, délai et échec.
+
+### Observers
+
+Ils restent limités aux automatismes techniques systématiques. Les workflows importants comme l’affectation, la finalisation ou la restauration restent visibles dans un service.
+
+## 11. Transactions et cohérence
+
+Toute opération modifiant plusieurs agrégats est transactionnelle. Un verrou `lockForUpdate()` est utilisé lorsque deux utilisateurs peuvent effectuer la même transition simultanément.
+
+Un événement ou un job qui lit l’état produit par une transaction ne doit être diffusé qu’après commit. Une erreur ne doit jamais laisser un statut, un historique ou une notification partiellement enregistrés.
+
+## 12. Sécurité applicative
+
+- mots de passe hachés par Laravel ;
+- cookies sécurisés et sessions régénérées à la connexion ;
+- limitation des tentatives de connexion et de récupération ;
+- permissions fermées par défaut ;
+- confirmation récente du mot de passe pour les opérations sensibles ;
+- sauvegardes et pièces sensibles stockées hors du répertoire public ;
+- téléchargement uniquement via un contrôleur autorisé ;
+- validation du type MIME, de l’extension, de la taille et du nom de stockage ;
+- secrets uniquement dans l’environnement ;
+- aucune donnée secrète dans les logs ;
+- journalisation du résultat des actions sensibles ;
+- protection contre l’affectation de masse ;
+- validation serveur obligatoire, même si le navigateur valide déjà ;
+- restauration protégée par permission, réauthentification, phrase de confirmation et audit.
+
+## 13. Scheduler et queues
+
+Le scheduler déclenche les recherches de travail, puis les jobs sont exécutés par la queue :
+
+```text
+missions:send-reminders
+reports:generate-periodic
+backups:create
+audit:prune
+```
+
+En production, cron appelle le scheduler chaque minute :
+
+```cron
+* * * * * php /path/to/artisan schedule:run >> /dev/null 2>&1
+```
+
+Un worker ou un mécanisme cPanel équivalent exécute la queue. Les rapports, courriels et rappels ne doivent pas bloquer une requête web.
+
+## 14. Conventions de nommage
+
+| Élément | Convention | Exemple |
+|---|---|---|
+| Namespace | anglais, `PascalCase` | `App\Services\Mission` |
+| Controller | suffixe `Controller` | `MissionController` |
+| Méthode controller | préfixe `ctrl_` | `ctrl_assign` |
+| Service | suffixe `Service` | `MissionService` |
+| Méthode service | préfixe `srv_` | `srv_assign` |
+| Repository | suffixe `Repository` | `MissionRepository` |
+| Méthode repository | préfixe `repo_` | `repo_findByUuid` |
+| Model | suffixe `Model` | `SearchMissionModel` |
+| DTO | suffixe `DTO` | `AssignMissionDTO` |
+| Request | suffixe `FormRequest` | `AssignMissionFormRequest` |
+| Table | anglais, préfixée | `mis_search_mission_models` |
+| Colonne | anglais, `snake_case` | `assigned_user_code_unique` |
+| Route | anglais, `kebab-case` | `/mission-reports` |
+| Nom de route | anglais, pointé | `missions.assign` |
+| Event | anglais, passé | `MissionAssigned` |
+| Job | anglais, impératif | `SendMissionReminder` |
+| Permission | anglais, `resource_action` | `missions_assign` |
+
+Les points sont réservés aux noms de routes Laravel. Les codes de permission utilisent exclusivement des lettres minuscules et des underscores.
+
+Exemples interdits :
+
+```text
+FormulaireController
+UtilisateurService
+date_recherche
+numero_formulaire
+/parametres
+```
+
+Équivalents attendus :
+
+```text
+MissingFormController
+UserService
+search_date
+reference_number
+/settings
+```
+
+## 15. Tests
+
+- tests Feature pour routes, sessions, CSRF, permissions, validation et réponses ;
+- tests Integration pour repositories, transactions, événements et listeners ;
+- tests Unit pour règles métier isolées, DTOs et objets de valeur ;
+- tests de jobs pour rappels, rapports et sauvegardes ;
+- tests de sécurité pour accès interdits, réauthentification, uploads et téléchargements.
+
+Chaque workflow critique couvre au minimum : succès, validation invalide, accès refusé, transition interdite, concurrence pertinente, historique, événement attendu et absence d’effet partiel après erreur.
+
+## 16. Ordre de construction
+
+1. fondations : identifiants, exceptions, logs, provider des repositories ;
+2. authentification et sécurité de session ;
+3. administration, rôles, modules et permissions ;
+4. organisation : directions et services ;
+5. registre et historique des formulaires ;
+6. missions, comptes rendus et événements ;
+7. notifications, rappels, scheduler et queue ;
+8. statistiques, exports et rapports périodiques ;
+9. audit, sauvegarde et restauration ;
+10. durcissement, tests de non-régression et déploiement cPanel.
+
+## 17. Règle d’évolution
+
+Une fonctionnalité nouvelle doit préciser son domaine, ses couches, sa permission, ses invariants, ses événements, sa trace d’audit et ses tests. Un domaine ne dépend jamais du contrôleur d’un autre domaine. Toute exception à cette architecture doit être motivée avant son implémentation.
+
+Les instructions exécutables pour les agents se trouvent dans `skills/risfm-laravel-backend/SKILL.md`.

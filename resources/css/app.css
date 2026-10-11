@@ -1,0 +1,33 @@
+@import '@tabler/core/dist/css/tabler.min.css';
+@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+
+:root {
+    --risfm-green: #009846;
+    --risfm-green-rgb: 0, 152, 70;
+    --risfm-orange: #f58220;
+    --risfm-ink: #12332a;
+    --risfm-surface: #f5f8f6;
+    --tblr-primary: var(--risfm-green);
+    --tblr-primary-rgb: var(--risfm-green-rgb);
+    --tblr-font-sans-serif: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+    background: var(--risfm-surface);
+    color: var(--risfm-ink);
+}
+
+.navbar-brand-mark {
+    align-items: center;
+    background: rgba(var(--risfm-green-rgb), 0.1);
+    border-radius: 0.75rem;
+    color: var(--risfm-green);
+    display: inline-flex;
+    height: 2.5rem;
+    justify-content: center;
+    width: 2.5rem;
+}
+
+.risfm-accent {
+    border-top: 3px solid var(--risfm-orange);
+}
