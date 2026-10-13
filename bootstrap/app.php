@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureSessionIsCurrent;
+use App\Http\Middleware\PreventSearchEngineIndexing;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ['middleware' => ['web', 'auth', 'session.current', 'password.changed']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(PreventSearchEngineIndexing::class);
         $middleware->redirectGuestsTo(fn (Request $request): string => route('login'));
         $middleware->redirectUsersTo(fn (Request $request): string => route('dashboard'));
         $middleware->alias([

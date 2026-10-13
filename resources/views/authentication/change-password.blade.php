@@ -124,11 +124,53 @@
         </div>
     </div>
 
-    <form class="text-center mt-3" method="post" action="{{ route('logout') }}">
-        @csrf
-        <button class="btn btn-link text-secondary text-decoration-none small" type="submit">
+    <div class="text-center mt-3">
+        <button
+            type="button"
+            class="btn btn-link text-secondary text-decoration-none small"
+            data-bs-toggle="modal"
+            data-bs-target="#modal-logout-confirm"
+        >
             <i class="ti ti-logout me-1" aria-hidden="true"></i>
             Se déconnecter
         </button>
-    </form>
+    </div>
+
+    @push('modals')
+        <!-- MODALE DE CONFIRMATION DE DÉCONNEXION TABLER -->
+        <div class="modal modal-blur fade" id="modal-logout-confirm" tabindex="-1" role="dialog" aria-labelledby="modal-logout-title" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    <div class="modal-status bg-danger"></div>
+                    <div class="modal-body text-center py-4">
+                        <i class="ti ti-logout fs-1 text-danger mb-2" aria-hidden="true"></i>
+                        <h3 id="modal-logout-title">Déconnexion</h3>
+                        <div class="text-secondary small">
+                            Êtes-vous sûr de vouloir vous déconnecter de votre session RISFM ?
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row g-2">
+                                <div class="col">
+                                    <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">
+                                        Annuler
+                                    </button>
+                                </div>
+                                <div class="col">
+                                    <form method="post" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button class="btn btn-danger w-100" type="submit" id="btn-confirm-logout">
+                                            Se déconnecter
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endpush
 @endsection

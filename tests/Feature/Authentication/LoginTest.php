@@ -42,7 +42,10 @@ final class LoginTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
         $this->assertNotNull($user->fresh()->last_login_at);
-        $this->get(route('dashboard'))->assertOk();
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('modal-logout-confirm')
+            ->assertSee('Êtes-vous sûr de vouloir vous déconnecter de votre session RISFM ?');
 
         $this->post(route('logout'))->assertRedirect(route('login'));
         $this->assertGuest();
@@ -106,10 +109,16 @@ final class LoginTest extends TestCase
             ])->assertSessionHasErrors('login');
         }
 
-        $this->post(route('login.store'), [
+        $response = $this->post(route('login.store'), [
             'login' => $user->username,
             'password' => 'WrongSecret123!',
-        ])->assertTooManyRequests();
+        ]);
+
+        $response->assertTooManyRequests()
+            ->assertSee('ERREUR 429')
+            ->assertSee('Trop de tentatives de connexion')
+            ->assertSee('countdown-seconds')
+            ->assertSee(route('login'));
     }
 
     /** @param array<string, mixed> $attributes */

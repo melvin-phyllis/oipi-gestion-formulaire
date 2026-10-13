@@ -25,7 +25,6 @@
     <div class="page-header d-print-none mb-3">
         <div class="row align-items-center g-2">
             <div class="col">
-                <div class="page-pretitle text-uppercase text-primary fw-semibold">Administration du système</div>
                 <h1 class="page-title d-flex align-items-center gap-2">
                     <i class="ti ti-shield-lock text-primary"></i>
                     <span>Rôles & Permissions</span>

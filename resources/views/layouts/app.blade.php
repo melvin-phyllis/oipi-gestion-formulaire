@@ -4,9 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 
-    <title>@yield('title', 'RISFM') — OIPI</title>
+    <title>@yield('title', 'RISFM') | OIPI</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/oipi-favicon.png') }}">
 
+    @include('partials.theme-initializer')
     <script>
         (() => {
             try {
@@ -49,6 +52,19 @@
                 @auth
                     <!-- ACTIONS MOBILE (EN HAUT A DROITE SUR ECRAN MOBILE) -->
                     <div class="navbar-nav flex-row order-lg-last d-flex d-lg-none ms-auto align-items-center">
+                        <div class="nav-item me-1">
+                            <button
+                                type="button"
+                                class="nav-link px-2 text-secondary risfm-theme-toggle"
+                                data-theme-toggle
+                                aria-label="Activer le mode sombre"
+                                title="Activer le mode sombre"
+                            >
+                                <i class="ti ti-moon fs-2 risfm-theme-icon-dark" aria-hidden="true"></i>
+                                <i class="ti ti-sun fs-2 risfm-theme-icon-light" aria-hidden="true"></i>
+                                <span class="visually-hidden" data-theme-label>Activer le mode sombre</span>
+                            </button>
+                        </div>
                         @can('notifications_view')
                             <div class="nav-item me-2">
                                 <a
@@ -97,13 +113,15 @@
                                     Changer de mot de passe
                                 </a>
                                 <div class="dropdown-divider"></div>
-                                <form method="post" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button class="dropdown-item text-danger" type="submit">
-                                        <i class="ti ti-logout me-2 dropdown-item-icon text-danger" aria-hidden="true"></i>
-                                        Déconnexion
-                                    </button>
-                                </form>
+                                <button
+                                    type="button"
+                                    class="dropdown-item text-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-logout-confirm"
+                                >
+                                    <i class="ti ti-logout me-2 dropdown-item-icon text-danger" aria-hidden="true"></i>
+                                    Déconnexion
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -232,6 +250,19 @@
             <div class="container-xl">
                 <div class="navbar-nav flex-row order-md-last ms-auto align-items-center">
                     @auth
+                        <div class="nav-item me-2">
+                            <button
+                                type="button"
+                                class="nav-link px-2 text-secondary risfm-theme-toggle"
+                                data-theme-toggle
+                                aria-label="Activer le mode sombre"
+                                title="Activer le mode sombre"
+                            >
+                                <i class="ti ti-moon fs-2 risfm-theme-icon-dark" aria-hidden="true"></i>
+                                <i class="ti ti-sun fs-2 risfm-theme-icon-light" aria-hidden="true"></i>
+                                <span class="visually-hidden" data-theme-label>Activer le mode sombre</span>
+                            </button>
+                        </div>
                         @can('notifications_view')
                             <div class="nav-item me-3">
                                 <a
@@ -283,13 +314,15 @@
                                 @endcan
 
                                 <div class="dropdown-divider"></div>
-                                <form method="post" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button class="dropdown-item text-danger" type="submit">
-                                        <i class="ti ti-logout me-2 dropdown-item-icon text-danger" aria-hidden="true"></i>
-                                        Déconnexion
-                                    </button>
-                                </form>
+                                <button
+                                    type="button"
+                                    class="dropdown-item text-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-logout-confirm"
+                                >
+                                    <i class="ti ti-logout me-2 dropdown-item-icon text-danger" aria-hidden="true"></i>
+                                    Déconnexion
+                                </button>
                             </div>
                         </div>
                     @endauth
@@ -330,6 +363,44 @@
             </main>
         </div>
     </div>
+
+    @auth
+        <!-- MODALE DE CONFIRMATION DE DÉCONNEXION TABLER -->
+        <div class="modal modal-blur fade" id="modal-logout-confirm" tabindex="-1" role="dialog" aria-labelledby="modal-logout-title" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    <div class="modal-status bg-danger"></div>
+                    <div class="modal-body text-center py-4">
+                        <i class="ti ti-logout fs-1 text-danger mb-2" aria-hidden="true"></i>
+                        <h3 id="modal-logout-title">Déconnexion</h3>
+                        <div class="text-secondary small">
+                            Êtes-vous sûr de vouloir vous déconnecter de votre session RISFM ?
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="w-100">
+                            <div class="row g-2">
+                                <div class="col">
+                                    <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">
+                                        Annuler
+                                    </button>
+                                </div>
+                                <div class="col">
+                                    <form method="post" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button class="btn btn-danger w-100" type="submit" id="btn-confirm-logout">
+                                            Se déconnecter
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endauth
 
     @stack('modals')
     @stack('scripts')

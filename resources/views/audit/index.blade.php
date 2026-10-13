@@ -12,7 +12,6 @@
     <div class="page-header d-print-none mb-3">
         <div class="row align-items-center g-2">
             <div class="col">
-                <div class="page-pretitle text-uppercase text-primary fw-semibold">Sécurité et traçabilité</div>
                 <h1 class="page-title d-flex align-items-center gap-2">
                     <span>Journal d’audit</span>
                     <span class="badge bg-primary-lt text-primary fs-6 font-monospace">

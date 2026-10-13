@@ -629,43 +629,11 @@
         <!-- COLONNE DROITE : EVOLUTION SUR 6 MOIS -->
         <div class="col-12 col-xl-6">
             <div class="card h-100">
-                <div class="card-header py-3 bg-light-subtle d-flex justify-content-between align-items-center">
+                <div class="card-header py-3 bg-light-subtle">
                     <h3 class="card-title d-flex align-items-center gap-2 mb-0">
                         <i class="ti ti-chart-line text-primary fs-2"></i>
                         <span>Évolution mensuelle sur six mois</span>
                     </h3>
-                    @if ($monthlyTrend->isNotEmpty())
-                        <ul class="nav nav-pills card-header-pills" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button
-                                    class="nav-link active py-1 px-2 small"
-                                    id="trend-chart-tab"
-                                    data-bs-toggle="pill"
-                                    data-bs-target="#trend-chart-pane"
-                                    type="button"
-                                    role="tab"
-                                    aria-controls="trend-chart-pane"
-                                    aria-selected="true"
-                                >
-                                    <i class="ti ti-chart-area-line me-1" aria-hidden="true"></i>Graphique
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button
-                                    class="nav-link py-1 px-2 small"
-                                    id="trend-table-tab"
-                                    data-bs-toggle="pill"
-                                    data-bs-target="#trend-table-pane"
-                                    type="button"
-                                    role="tab"
-                                    aria-controls="trend-table-pane"
-                                    aria-selected="false"
-                                >
-                                    <i class="ti ti-table me-1" aria-hidden="true"></i>Tableau
-                                </button>
-                            </li>
-                        </ul>
-                    @endif
                 </div>
 
                 @if ($monthlyTrend->isEmpty())
@@ -675,14 +643,44 @@
                         <div class="small text-secondary">Les statistiques évolutives s'afficheront dès que des formulaires seront enregistrés.</div>
                     </div>
                 @else
-                    <div class="tab-content">
+                    <div class="card-body p-0">
+                        <div class="risfm-trend-view-switch border-bottom px-3 py-2">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Mode d’affichage de l’évolution mensuelle">
+                                <button
+                                    class="btn btn-primary"
+                                    id="trend-chart-tab"
+                                    type="button"
+                                    role="tab"
+                                    aria-controls="trend-chart-pane"
+                                    aria-selected="true"
+                                    data-trend-view="chart"
+                                >
+                                    Graphique
+                                </button>
+                                <button
+                                    class="btn btn-outline-secondary"
+                                    id="trend-table-tab"
+                                    type="button"
+                                    role="tab"
+                                    aria-controls="trend-table-pane"
+                                    aria-selected="false"
+                                    data-trend-view="table"
+                                >
+                                    Tableau
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- VUE GRAPHIQUE TABLER / APEXCHARTS -->
-                        <div class="tab-pane fade show active p-3" id="trend-chart-pane" role="tabpanel" aria-labelledby="trend-chart-tab">
-                            <div id="chart-monthly-trend" style="min-height: 280px; width: 100%;"></div>
+                        <div class="p-3" id="trend-chart-pane" role="tabpanel" aria-labelledby="trend-chart-tab" data-trend-pane="chart">
+                            <div id="chart-monthly-trend" class="risfm-monthly-trend-chart"></div>
+                            <div class="alert alert-warning mb-0 d-none" role="alert" data-trend-chart-error>
+                                Le graphique n’a pas pu être chargé. Les données restent disponibles dans la vue Tableau.
+                            </div>
                         </div>
 
                         <!-- VUE TABLEAU RECAPITULATIF -->
-                        <div class="tab-pane fade" id="trend-table-pane" role="tabpanel" aria-labelledby="trend-table-tab">
+                        <div id="trend-table-pane" role="tabpanel" aria-labelledby="trend-table-tab" data-trend-pane="table" hidden>
                             <div class="table-responsive">
                                 <table class="table table-vcenter card-table table-hover table-striped">
                                     <thead>
@@ -872,15 +870,13 @@
 @if ($monthlyTrend->isNotEmpty())
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                if (typeof window.ApexCharts === 'undefined') {
-                    return;
-                }
-
+            (() => {
                 const chartContainer = document.getElementById('chart-monthly-trend');
-                if (!chartContainer) {
-                    return;
-                }
+                const chartError = document.querySelector('[data-trend-chart-error]');
+                const viewButtons = document.querySelectorAll('[data-trend-view]');
+                const viewPanes = document.querySelectorAll('[data-trend-pane]');
+
+                if (!chartContainer || chartContainer.dataset.initialized === 'true') return;
 
                 const categories = @json($monthlyTrend->pluck('label')->values());
                 const registrationsData = @json($monthlyTrend->pluck('registrations')->values());
@@ -888,139 +884,193 @@
                 const foundReportsData = @json($monthlyTrend->pluck('foundReports')->values());
                 const resolvedFormsData = @json($monthlyTrend->pluck('resolvedForms')->values());
 
-                const options = {
-                    series: [
-                        {
-                            name: 'Déclarés',
-                            data: registrationsData,
+                viewButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const requestedView = button.dataset.trendView;
+
+                        viewPanes.forEach((pane) => {
+                            pane.hidden = pane.dataset.trendPane !== requestedView;
+                        });
+
+                        viewButtons.forEach((candidate) => {
+                            const active = candidate === button;
+                            candidate.classList.toggle('btn-primary', active);
+                            candidate.classList.toggle('btn-outline-secondary', !active);
+                            candidate.setAttribute('aria-selected', String(active));
+                        });
+
+                        if (requestedView === 'chart') {
+                            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+                        }
+                    });
+                });
+
+                const themeOptions = (theme = document.documentElement.getAttribute('data-bs-theme')) => {
+                    const dark = theme === 'dark';
+
+                    return {
+                        chart: {
+                            foreColor: dark ? '#d7dfda' : '#66736d',
                         },
-                        {
-                            name: 'Recherches',
-                            data: searchesData,
-                        },
-                        {
-                            name: 'Retrouvés',
-                            data: foundReportsData,
-                        },
-                        {
-                            name: 'Résolus',
-                            data: resolvedFormsData,
-                        },
-                    ],
-                    chart: {
-                        type: 'line',
-                        height: 290,
-                        fontFamily: 'inherit',
-                        parentHeightOffset: 0,
-                        toolbar: {
-                            show: false,
-                        },
-                        animations: {
-                            enabled: true,
-                            easing: 'easeinout',
-                            speed: 500,
-                        },
-                    },
-                    colors: [
-                        '#adb5bd',
-                        '#6c757d',
-                        '#009846',
-                        '#009846',
-                    ],
-                    dataLabels: {
-                        enabled: false,
-                    },
-                    fill: {
-                        opacity: 0,
-                    },
-                    stroke: {
-                        curve: 'smooth',
-                        width: [2, 2, 2, 3],
-                        dashArray: [6, 3, 6, 0],
-                        lineCap: 'round',
-                    },
-                    grid: {
-                        strokeDashArray: 4,
-                        padding: {
-                            top: -10,
-                            right: 12,
-                            left: 12,
-                            bottom: 0,
-                        },
-                    },
-                    xaxis: {
-                        categories: categories,
-                        labels: {
-                            padding: 4,
-                            style: {
-                                fontSize: '12px',
-                                fontWeight: 500,
-                            },
-                        },
-                        axisBorder: {
-                            show: false,
-                        },
-                        axisTicks: {
-                            show: false,
+                        grid: {
+                            borderColor: dark ? '#34413b' : '#e4e9e6',
                         },
                         tooltip: {
-                            enabled: false,
+                            theme: dark ? 'dark' : 'light',
                         },
-                    },
-                    yaxis: {
-                        labels: {
-                            padding: 4,
-                            formatter: function (val) {
-                                return Math.round(val);
-                            },
-                        },
-                        min: 0,
-                        forceNiceScale: true,
-                    },
-                    legend: {
-                        show: true,
-                        position: 'top',
-                        horizontalAlign: 'right',
-                        markers: {
-                            radius: 12,
-                            width: 10,
-                            height: 10,
-                        },
-                        itemMargin: {
-                            horizontal: 10,
-                            vertical: 4,
-                        },
-                    },
-                    tooltip: {
-                        theme: 'light',
-                        shared: true,
-                        intersect: false,
-                        y: {
-                            formatter: function (val) {
-                                return val + ' dossier(s)';
-                            },
-                        },
-                    },
-                    markers: {
-                        size: 0,
-                        strokeWidth: 2,
-                        hover: {
-                            size: 4,
-                        },
-                    },
+                    };
                 };
 
-                const chart = new window.ApexCharts(chartContainer, options);
-                chart.render();
+                const initializeChart = () => {
+                    if (typeof window.ApexCharts !== 'function') {
+                        chartContainer.classList.add('d-none');
+                        chartError?.classList.remove('d-none');
 
-                // Recalcul de taille fluide lors de l'activation de l'onglet
-                const chartTab = document.getElementById('trend-chart-tab');
-                if (chartTab) {
-                    chartTab.addEventListener('shown.bs.tab', function () {
-                        window.dispatchEvent(new Event('resize'));
+                        return;
+                    }
+
+                    const activeThemeOptions = themeOptions();
+                    const options = {
+                        series: [
+                            {
+                                name: 'Déclarés',
+                                data: registrationsData,
+                            },
+                            {
+                                name: 'Recherches',
+                                data: searchesData,
+                            },
+                            {
+                                name: 'Retrouvés',
+                                data: foundReportsData,
+                            },
+                            {
+                                name: 'Résolus',
+                                data: resolvedFormsData,
+                            },
+                        ],
+                        chart: {
+                            type: 'line',
+                            height: 290,
+                            fontFamily: 'inherit',
+                            foreColor: activeThemeOptions.chart.foreColor,
+                            parentHeightOffset: 0,
+                            redrawOnParentResize: true,
+                            redrawOnWindowResize: true,
+                            toolbar: {
+                                show: false,
+                            },
+                            animations: {
+                                enabled: true,
+                                easing: 'easeinout',
+                                speed: 450,
+                            },
+                        },
+                        colors: [
+                            '#9aa5a0',
+                            '#65726c',
+                            '#55ad78',
+                            '#009846',
+                        ],
+                        dataLabels: {
+                            enabled: false,
+                        },
+                        fill: {
+                            opacity: 0,
+                        },
+                        stroke: {
+                            curve: 'smooth',
+                            width: [2, 2, 2, 3],
+                            dashArray: [6, 3, 6, 0],
+                            lineCap: 'round',
+                        },
+                        grid: {
+                            borderColor: activeThemeOptions.grid.borderColor,
+                            strokeDashArray: 4,
+                            padding: {
+                                top: 4,
+                                right: 12,
+                                left: 12,
+                                bottom: 0,
+                            },
+                        },
+                        xaxis: {
+                            categories,
+                            labels: {
+                                style: {
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                },
+                            },
+                            axisBorder: {
+                                show: false,
+                            },
+                            axisTicks: {
+                                show: false,
+                            },
+                            tooltip: {
+                                enabled: false,
+                            },
+                        },
+                        yaxis: {
+                            min: 0,
+                            forceNiceScale: true,
+                            labels: {
+                                formatter: (value) => Math.round(value),
+                            },
+                        },
+                        legend: {
+                            show: true,
+                            position: 'top',
+                            horizontalAlign: 'center',
+                            itemMargin: {
+                                horizontal: 8,
+                                vertical: 4,
+                            },
+                        },
+                        tooltip: {
+                            theme: activeThemeOptions.tooltip.theme,
+                            shared: true,
+                            intersect: false,
+                            y: {
+                                formatter: (value) => `${value} dossier(s)`,
+                            },
+                        },
+                        markers: {
+                            size: 3,
+                            strokeWidth: 0,
+                            hover: {
+                                size: 5,
+                            },
+                        },
+                        noData: {
+                            text: 'Aucune donnée disponible',
+                            align: 'center',
+                            verticalAlign: 'middle',
+                        },
+                    };
+
+                    const chart = new window.ApexCharts(chartContainer, options);
+                    chartContainer.dataset.initialized = 'true';
+
+                    chart.render().catch(() => {
+                        chartContainer.classList.add('d-none');
+                        chartError?.classList.remove('d-none');
                     });
+
+                    document.addEventListener('risfm:theme-changed', (event) => {
+                        chart.updateOptions(themeOptions(event.detail?.theme), false, false);
+                    });
+                };
+
+                if (typeof window.ApexCharts === 'function') {
+                    initializeChart();
+                } else if (document.readyState === 'complete') {
+                    initializeChart();
+                } else {
+                    window.addEventListener('load', initializeChart, { once: true });
                 }
-            });
+            })();
         </script>
     @endpush
 @endif

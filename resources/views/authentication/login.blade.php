@@ -15,6 +15,27 @@
                 </div>
             @endif
 
+            @if (session('success'))
+                <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
+                    <i class="ti ti-circle-check fs-2 me-2" aria-hidden="true"></i>
+                    <div>{{ session('success') }}</div>
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+                    <i class="ti ti-alert-circle fs-2 me-2" aria-hidden="true"></i>
+                    <div>{{ session('error') }}</div>
+                </div>
+            @endif
+
+            @if (session('warning'))
+                <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                    <i class="ti ti-alert-triangle fs-2 me-2" aria-hidden="true"></i>
+                    <div>{{ session('warning') }}</div>
+                </div>
+            @endif
+
             <form method="post" action="{{ route('login.store') }}" autocomplete="off" novalidate>
                 @csrf
 

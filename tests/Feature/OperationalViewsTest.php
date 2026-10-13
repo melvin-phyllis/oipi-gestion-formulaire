@@ -233,6 +233,9 @@ final class OperationalViewsTest extends TestCase
             ->assertSee('data-risfm-sidebar-toggle', false)
             ->assertSee('risfm-sidebar-icon-collapse', false)
             ->assertSee('risfm-sidebar-icon-expand', false)
+            ->assertSee('data-trend-view="chart"', false)
+            ->assertSee('data-trend-view="table"', false)
+            ->assertSee('data-trend-pane="table" hidden', false)
             ->assertDontSee('Réduire ou agrandir la barre latérale')
             ->assertDontSee('<span class="nav-link-title">Notifications</span>', false);
 

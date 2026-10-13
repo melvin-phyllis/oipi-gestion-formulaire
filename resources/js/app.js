@@ -2,6 +2,7 @@ import * as tabler from '@tabler/core';
 import ApexCharts from '@tabler/core/dist/libs/apexcharts/dist/apexcharts.min.js';
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import './theme-switcher';
 
 window.tabler = tabler;
 window.ApexCharts = ApexCharts;

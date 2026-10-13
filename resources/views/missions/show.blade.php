@@ -363,7 +363,7 @@
                                                     <i class="ti ti-circle-check text-green fs-1 me-2 flex-shrink-0"></i>
                                                     <div>
                                                         <div class="fw-bold text-dark">Retrouvé</div>
-                                                        <div class="text-secondary small">Le document original a été physiquement localisé dans cette zone.</div>
+                                                        <div class="text-secondary small">Le document original a été localisé dans cette zone.</div>
                                                     </div>
                                                 </div>
                                                 <div class="form-selectgroup-check ms-2 flex-shrink-0"></div>
@@ -409,7 +409,7 @@
                                                     <i class="ti ti-file-x text-red fs-1 me-2 flex-shrink-0"></i>
                                                     <div>
                                                         <div class="fw-bold text-dark">Non retrouvé</div>
-                                                        <div class="text-secondary small">Recherche infructueuse après fouille méthodique complète dans cette zone.</div>
+                                                        <div class="text-secondary small">Recherche infructueuse après fouille .</div>
                                                     </div>
                                                 </div>
                                                 <div class="form-selectgroup-check ms-2 flex-shrink-0"></div>

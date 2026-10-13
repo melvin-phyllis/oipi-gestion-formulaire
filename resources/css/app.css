@@ -21,6 +21,23 @@
         "Segoe UI", sans-serif;
 }
 
+[data-bs-theme="dark"] {
+    --risfm-ink: #e7eee9;
+    --risfm-surface: #141917;
+}
+
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--tblr-bg-surface) !important;
+}
+
+[data-bs-theme="dark"] .text-dark:not(.bg-warning) {
+    color: var(--tblr-body-color) !important;
+}
+
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--tblr-tertiary-bg) !important;
+}
+
 /* Neutralisation stricte de l'azure, du bleu et de l'info au profit de l'OIPI */
 .bg-azure-lt, .bg-blue-lt, .bg-info-lt {
     background-color: rgba(var(--risfm-green-rgb), 0.1) !important;
@@ -46,6 +63,82 @@
 body {
     background: var(--risfm-surface);
     color: var(--risfm-ink);
+}
+
+.risfm-theme-toggle {
+    align-items: center;
+    border: 0;
+    display: inline-flex;
+    justify-content: center;
+}
+
+.risfm-theme-toggle-floating {
+    inset-inline-end: 1rem;
+    position: fixed;
+    top: 1rem;
+    z-index: 1030;
+}
+
+.risfm-trend-view-switch {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.risfm-trend-view-switch .btn-group {
+    box-shadow: none;
+}
+
+.risfm-monthly-trend-chart {
+    min-height: 290px;
+    width: 100%;
+}
+
+[data-trend-pane][hidden] {
+    display: none !important;
+}
+
+@media (max-width: 575.98px) {
+    .risfm-trend-view-switch {
+        justify-content: stretch;
+    }
+
+    .risfm-trend-view-switch .btn-group,
+    .risfm-trend-view-switch .btn {
+        flex: 1 1 0;
+    }
+}
+
+.risfm-theme-icon-light {
+    display: none;
+}
+
+[data-bs-theme="dark"] .risfm-theme-icon-dark {
+    display: none;
+}
+
+[data-bs-theme="dark"] .risfm-theme-icon-light {
+    display: inline-block;
+}
+
+html.risfm-theme-transition::view-transition-old(root),
+html.risfm-theme-transition::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
+html.risfm-theme-transition::view-transition-old(root) {
+    z-index: 1;
+}
+
+html.risfm-theme-transition::view-transition-new(root) {
+    z-index: 9999;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.risfm-theme-transition::view-transition-old(root),
+    html.risfm-theme-transition::view-transition-new(root) {
+        display: none;
+    }
 }
 
 /* Les titres restent sobres : les icônes sont réservées aux actions et à la navigation. */

@@ -2,7 +2,33 @@
 
 Nouvelle application web de l’Office Ivoirien de la Propriété Intellectuelle (OIPI), destinée au suivi centralisé des formulaires d’enregistrement des titres de propriété intellectuelle non retrouvés, manquants ou en cours de recherche.
 
-Ce dépôt contient la future version Laravel de RISFM. Il repart du besoin métier et ne reprend pas automatiquement l’architecture ou les choix techniques d’une application antérieure.
+Guide de mise en production : [Déploiement sur cPanel](DEPLOIEMENT_CPANEL.md).
+
+Ce dépôt contient la version Laravel de RISFM. Il repart du besoin métier et ne reprend pas automatiquement l’architecture ou les choix techniques d’une application antérieure.
+
+## Stack technique
+
+L’application est un projet Laravel monolithique : le backend, les pages Blade et les traitements métier sont réunis dans la même application. Il n’y a pas de frontend séparé ni d’API externe obligatoire pour utiliser RISFM.
+
+| Technologie | Utilisation dans le projet |
+| --- | --- |
+| PHP 8.3 | Langage exécuté sur le serveur. |
+| Laravel 13 | Routage, authentification, validation, autorisations, services, événements, tâches planifiées et files d’attente. |
+| Blade | Génération des pages HTML côté serveur. |
+| Tabler | Composants et présentation de l’interface d’administration. |
+| JavaScript et Laravel Echo | Interactions dans les pages et réception des notifications en temps réel. |
+| Vite | Compilation du JavaScript, du CSS, des polices et des dépendances frontend. |
+| MySQL ou MariaDB | Stockage des utilisateurs, formulaires, missions, notifications, audits, sessions, cache et tâches en attente. |
+| Pusher Channels | Diffusion en temps réel du compteur de notifications et de la progression des imports. |
+| Laravel Queue | Exécution en arrière-plan des imports volumineux et des notifications. Le projet utilise la file d’attente en base de données. |
+| Laravel Scheduler | Déclenchement des relances de missions et des sauvegardes automatiques depuis une tâche cron cPanel. |
+| PhpSpreadsheet | Lecture des imports XLSX et génération des exports Excel. |
+| Dompdf | Génération des rapports PDF. |
+| Stockage privé Laravel | Conservation des pièces jointes, fichiers d’import et sauvegardes hors du dossier public. |
+| `mysql` et `mysqldump` | Restauration et sauvegarde de la base depuis le module d’administration. |
+| PHPUnit et Laravel Pint | Tests automatisés et formatage du code PHP. |
+
+Le navigateur communique avec Laravel en HTTPS. Laravel applique les permissions, exécute la logique métier et utilise MySQL ainsi que le stockage privé. Les traitements longs passent par le worker de file d’attente, tandis que Pusher transmet les mises à jour en temps réel au navigateur.
 
 ## 1. Problème à résoudre
 
