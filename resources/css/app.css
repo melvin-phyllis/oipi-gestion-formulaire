@@ -1,20 +1,61 @@
-@import '@tabler/core/dist/css/tabler.min.css';
-@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+@import "@tabler/core/dist/css/tabler.min.css";
+@import "@tabler/icons-webfont/dist/tabler-icons.min.css";
 
 :root {
     --risfm-green: #009846;
     --risfm-green-rgb: 0, 152, 70;
     --risfm-orange: #f58220;
+    --risfm-orange-rgb: 245, 130, 32;
     --risfm-ink: #12332a;
     --risfm-surface: #f5f8f6;
     --tblr-primary: var(--risfm-green);
     --tblr-primary-rgb: var(--risfm-green-rgb);
-    --tblr-font-sans-serif: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --tblr-azure: var(--risfm-green);
+    --tblr-azure-rgb: var(--risfm-green-rgb);
+    --tblr-blue: var(--risfm-green);
+    --tblr-blue-rgb: var(--risfm-green-rgb);
+    --tblr-info: var(--risfm-green);
+    --tblr-info-rgb: var(--risfm-green-rgb);
+    --tblr-font-sans-serif:
+        "Instrument Sans", system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+}
+
+/* Neutralisation stricte de l'azure, du bleu et de l'info au profit de l'OIPI */
+.bg-azure-lt, .bg-blue-lt, .bg-info-lt {
+    background-color: rgba(var(--risfm-green-rgb), 0.1) !important;
+    color: var(--risfm-green) !important;
+}
+
+.bg-azure, .bg-blue, .bg-info {
+    background-color: var(--risfm-green) !important;
+    color: #fff !important;
+}
+
+.text-azure, .text-blue, .text-info {
+    color: var(--risfm-green) !important;
+}
+
+.alert-info {
+    --tblr-alert-variant-color: var(--risfm-green) !important;
+    background-color: rgba(var(--risfm-green-rgb), 0.08) !important;
+    border-color: rgba(var(--risfm-green-rgb), 0.25) !important;
+    color: var(--risfm-ink) !important;
 }
 
 body {
     background: var(--risfm-surface);
     color: var(--risfm-ink);
+}
+
+/* Les titres restent sobres : les icônes sont réservées aux actions et à la navigation. */
+h1 > .ti,
+h2 > .ti,
+h3 > .ti,
+h4 > .ti,
+h5 > .ti,
+h6 > .ti {
+    display: none;
 }
 
 .navbar-brand-mark {
@@ -28,6 +69,251 @@ body {
     width: 2.5rem;
 }
 
+.risfm-sidebar-brand-logo {
+    display: block;
+    height: auto;
+    max-height: 3rem;
+    max-width: 11rem;
+    object-fit: contain;
+    width: auto;
+}
+
+@media (min-width: 992px) {
+    .risfm-sidebar-header {
+        gap: 0.5rem;
+        min-height: 4rem;
+        padding: 0.625rem 0.75rem 0.625rem 1rem;
+        width: 100%;
+    }
+
+    .risfm-sidebar-header .navbar-brand {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0;
+    }
+}
+
+@media (max-width: 991.98px) {
+    #sidebar .container-fluid {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        padding: 0.5rem 0.75rem;
+        min-height: 3.5rem;
+    }
+
+    #sidebar .navbar-toggler {
+        order: 1;
+        margin: 0 0.5rem 0 0;
+    }
+
+    .risfm-sidebar-header {
+        order: 2;
+        display: flex;
+        align-items: center;
+        width: auto !important;
+        min-height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex: 0 0 auto;
+    }
+
+    .risfm-sidebar-header .navbar-brand {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    #sidebar .navbar-nav.flex-row {
+        order: 3;
+        margin-left: auto !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #sidebar-menu {
+        order: 4;
+        width: 100% !important;
+    }
+}
+
+.risfm-sidebar-toggle {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--risfm-green);
+    flex: 0 0 auto;
+    opacity: 1 !important;
+}
+
+.risfm-sidebar-toggle:hover,
+.risfm-sidebar-toggle:focus-visible {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--risfm-green);
+}
+
+.risfm-sidebar-icon-expand {
+    display: none;
+}
+
+html[data-bs-sidebar^="folded"] .risfm-sidebar-icon-collapse {
+    display: none;
+}
+
+html[data-bs-sidebar^="folded"] .risfm-sidebar-icon-expand {
+    display: inline-block;
+}
+
+@media (min-width: 992px) {
+    html[data-bs-sidebar^="folded"] #sidebar .risfm-sidebar-toggle {
+        display: inline-flex !important;
+        opacity: 1 !important;
+    }
+
+    html[data-bs-sidebar^="folded"] #sidebar:not(:hover):not(:has(:focus-visible)) .risfm-sidebar-header {
+        justify-content: center;
+        padding-inline: 0.5rem;
+    }
+
+    html[data-bs-sidebar^="folded"] #sidebar:not(:hover):not(:has(:focus-visible)) .risfm-sidebar-header .navbar-brand {
+        display: none;
+    }
+}
+
 .risfm-accent {
     border-top: 3px solid var(--risfm-orange);
+}
+
+/* Page d'authentification */
+.risfm-auth-page {
+    background:
+        radial-gradient(
+            circle at 10% 10%,
+            rgba(var(--risfm-green-rgb), 0.08),
+            transparent 30rem
+        ),
+        radial-gradient(
+            circle at 90% 90%,
+            rgba(var(--risfm-orange-rgb), 0.06),
+            transparent 30rem
+        ),
+        var(--risfm-surface);
+    min-height: 100vh;
+}
+
+.risfm-auth-brand-logo {
+    display: block;
+    height: auto;
+    max-width: min(100%, 18rem);
+    object-fit: contain;
+    width: 18rem;
+}
+
+.risfm-auth-card {
+    border: none;
+
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 3rem rgba(18, 51, 42, 0.08);
+}
+
+.input-group-link {
+    cursor: pointer;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    color: var(--tblr-secondary);
+    transition: color 0.15s ease-in-out;
+}
+
+.input-group-link:hover {
+    color: var(--tblr-primary);
+}
+
+.timeline-event-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.form-selectgroup-input:checked + .form-selectgroup-label,
+.form-selectgroup-input:focus + .form-selectgroup-label,
+.form-selectgroup-label:hover {
+    background: var(--tblr-bg-forms, #ffffff) !important;
+    border-color: var(--tblr-border-color) !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Animation de la cloche lorsqu'il y a des notifications non lues */
+@keyframes risfm-bell-shake {
+    0%, 70%, 100% {
+        transform: rotate(0);
+    }
+    5% {
+        transform: rotate(12deg);
+    }
+    10% {
+        transform: rotate(-10deg);
+    }
+    15% {
+        transform: rotate(8deg);
+    }
+    20% {
+        transform: rotate(-6deg);
+    }
+    25% {
+        transform: rotate(4deg);
+    }
+    30% {
+        transform: rotate(-2deg);
+    }
+    35% {
+        transform: rotate(0);
+    }
+}
+
+.risfm-bell-shake {
+    display: inline-block;
+    transform-origin: top center;
+    animation: risfm-bell-shake 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .risfm-bell-shake {
+        animation: none !important;
+        transform: none !important;
+    }
+}
+
+/* Badge du compteur de notifications dans la barre de navigation */
+.risfm-notification-badge {
+    position: absolute !important;
+    top: 2px !important;
+    inset-inline-end: 2px !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    padding: 0.15rem 0.35rem !important;
+    min-width: 1.15rem !important;
+    height: 1.15rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 9999px !important;
+    border: 2px solid var(--tblr-bg-surface, #ffffff) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.15) !important;
+    pointer-events: none !important;
+    z-index: 2 !important;
+}
+
+.risfm-notification-badge[hidden],
+[data-notification-page-count][hidden],
+[data-notification-tab-count][hidden],
+[data-notification-read-all][hidden] {
+    display: none !important;
 }

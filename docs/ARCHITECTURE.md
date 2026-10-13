@@ -181,7 +181,7 @@ Connexion, déconnexion, récupération et changement de mot de passe, sessions,
 
 ### `Administration`
 
-Utilisateurs, rôles, modules, permissions, paramètres fonctionnels, activation et désactivation des comptes.
+Utilisateurs, rôles, permissions directes, paramètres fonctionnels, activation et désactivation des comptes.
 
 ### `Organization`
 
@@ -297,16 +297,14 @@ Les tables métier suivent `{prefix}_{entity}_models`.
 adm_user_models
 adm_role_models
 adm_permission_models
-adm_module_primary_models
-adm_module_secondary_models
-adm_module_secondary_permission_models
+adm_role_permission_models
 adm_setting_models
 
 org_directorate_models
 org_service_models
 
 reg_title_type_models
-reg_form_status_models
+reg_search_location_models
 reg_missing_form_models
 reg_form_attachment_models
 reg_form_status_history_models
@@ -320,6 +318,10 @@ aud_login_log_models
 
 bkp_backup_models
 ```
+
+Les statuts du registre ne sont pas paramétrables en base. Ils sont définis par
+`App\Enums\Registry\FormStatus` afin de protéger le workflow technique et ses
+transitions contre toute modification depuis l’interface d’administration.
 
 ### Identifiants et relations
 
@@ -340,31 +342,29 @@ Les exceptions à `uuid`, `code_unique` ou `SoftDeletes` sont limitées aux tabl
 
 ## 9. Rôles et permissions
 
-La matrice d’accès suit cette hiérarchie :
+Le contrôle d’accès reste volontairement simple :
 
 ```text
-Role
-  └── Primary module
-       └── Secondary module
-            └── Permission
+User -> Role -> Permissions
 ```
+
+RISFM ne possède aucune table de module principal ou de sous-module. Une permission appartient directement à un rôle par `adm_role_permission_models`. La colonne `group_code` de `adm_permission_models` sert uniquement à regrouper les permissions dans l’interface (`dashboard`, `registry`, `missions`, `attachments`, `analytics`, `administration`, `audit`, `backups`, `notifications`, `profile`) ; elle ne constitue pas un niveau d’autorisation supplémentaire.
 
 Exemples de permissions :
 
 ```text
 registry_view
 registry_create
-registry_update
+registry_update_metadata
 registry_archive
-missions_view
 missions_assign
-missions_report
-missions_cancel
+missions_record_any_result
+missions_record_own_result
+attachments_add_own
 analytics_view
-analytics_export
 users_manage
-backups_create
-backups_restore
+settings_manage
+backups_manage
 audit_view
 ```
 
@@ -521,7 +521,7 @@ Chaque workflow critique couvre au minimum : succès, validation invalide, accè
 
 1. fondations : identifiants, exceptions, logs, provider des repositories ;
 2. authentification et sécurité de session ;
-3. administration, rôles, modules et permissions ;
+3. administration, rôles et permissions directes ;
 4. organisation : directions et services ;
 5. registre et historique des formulaires ;
 6. missions, comptes rendus et événements ;

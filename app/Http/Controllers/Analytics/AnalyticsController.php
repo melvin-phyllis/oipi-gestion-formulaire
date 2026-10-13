@@ -1,0 +1,64 @@
+<?php
+
+namespace App\Http\Controllers\Analytics;
+
+use App\Dto\Analytics\AnalyticsFiltersDTO;
+use App\Events\Analytics\AnalyticsExported;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Analytics\AnalyticsFiltersFormRequest;
+use App\Models\Administration\UserModel;
+use App\Services\Analytics\AnalyticsExportService;
+use App\Services\Analytics\AnalyticsService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+final class AnalyticsController extends Controller
+{
+    public function __construct(
+        private readonly AnalyticsService $analytics,
+        private readonly AnalyticsExportService $exports,
+    ) {}
+
+    public function ctrl_index(AnalyticsFiltersFormRequest $request): View
+    {
+        return view('analytics.index', $this->analytics->srv_report(
+            AnalyticsFiltersDTO::fromValidated($request->validated()),
+        ));
+    }
+
+    public function ctrl_dashboard(Request $request): View
+    {
+        $user = $request->user();
+        abort_unless($user instanceof UserModel, 403);
+
+        return view('dashboard', $this->analytics->srv_dashboard($user));
+    }
+
+    public function ctrl_exportExcel(AnalyticsFiltersFormRequest $request): StreamedResponse
+    {
+        $filters = AnalyticsFiltersDTO::fromValidated($request->validated());
+        $response = $this->exports->srv_excel($filters);
+        $this->dispatchExported($request, 'xlsx');
+
+        return $response;
+    }
+
+    public function ctrl_exportPdf(AnalyticsFiltersFormRequest $request): Response
+    {
+        $filters = AnalyticsFiltersDTO::fromValidated($request->validated());
+        $response = $this->exports->srv_pdf($filters);
+        $this->dispatchExported($request, 'pdf');
+
+        return $response;
+    }
+
+    private function dispatchExported(AnalyticsFiltersFormRequest $request, string $format): void
+    {
+        $user = $request->user();
+        abort_unless($user instanceof UserModel, 403);
+
+        AnalyticsExported::dispatch($format, $user->uuid, $request->validated());
+    }
+}

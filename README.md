@@ -1,4 +1,4 @@
-# RISFM — Registre de suivi des formulaires manquants
+# OIPI Suivi PI (RISFM) — Registre de suivi des formulaires manquants
 
 Nouvelle application web de l’Office Ivoirien de la Propriété Intellectuelle (OIPI), destinée au suivi centralisé des formulaires d’enregistrement des titres de propriété intellectuelle non retrouvés, manquants ou en cours de recherche.
 
@@ -224,28 +224,37 @@ Ces fonctions pourront faire l’objet de phases complémentaires.
 
 ## 13. État actuel du dépôt
 
-Le projet est actuellement au stade **d’initialisation technique** :
+Le projet est actuellement au stade de **stabilisation avant recette métier et déploiement**. Les principaux blocs fonctionnels sont implémentés :
 
-- le squelette Laravel est installé ;
-- les dépendances PHP sont disponibles ;
-- l’environnement local et la clé d’application sont initialisés ;
-- les tests Laravel de base fonctionnent ;
-- aucune fonctionnalité métier RISFM n’est encore implémentée ;
-- aucune donnée de l’ancienne application n’a été migrée ;
-- le modèle de données définitif reste à concevoir et à valider.
+- authentification, changement et réinitialisation sécurisée du mot de passe ;
+- administration des utilisateurs, des rôles et des permissions ;
+- gestion des directions, des services et des référentiels du registre ;
+- création, consultation, modification, archivage et restauration des formulaires manquants ;
+- enregistrement direct d’un formulaire déjà retrouvé ;
+- import contrôlé et asynchrone de formulaires depuis des fichiers CSV ou XLSX ;
+- affectation, démarrage, annulation et réaffectation des missions de recherche ;
+- saisie des résultats, contrôle des résultats « à vérifier » et historique des recherches ;
+- parcours de finalisation « Retrouvé → Numérisé → Saisi dans l’ERP » et réouverture contrôlée ;
+- stockage privé, téléchargement contrôlé et suppression autorisée des pièces jointes ;
+- notifications applicatives, notifications par courriel et diffusion en temps réel avec Pusher ;
+- tableau de bord, statistiques de pilotage et exports Excel/PDF ;
+- journal d’audit des opérations sensibles ;
+- sauvegarde, téléchargement, restauration et nettoyage planifié des sauvegardes de base de données ;
+- tâches planifiées pour les relances de missions et les sauvegardes automatiques ;
+- tests fonctionnels couvrant les principaux modules et règles d’autorisation.
+
+La reprise complète des données de l’ancienne application et la validation sur l’hébergement cPanel cible ne sont pas encore finalisées.
 
 ## 14. Prochaines étapes recommandées
 
-1. valider ce cadrage avec les responsables métier ;
-2. formaliser les statuts et transitions autorisées ;
-3. définir précisément les permissions de chaque rôle ;
-4. concevoir le modèle de données Laravel ;
-5. définir la stratégie de reprise des données existantes ;
-6. construire l’authentification et les autorisations ;
-7. développer le registre et les missions par étapes ;
-8. ajouter les tests de sécurité et de non-régression ;
-9. réaliser une recette métier sur un environnement séparé ;
-10. préparer le déploiement et le plan de retour arrière.
+1. stabiliser la suite automatisée et corriger toute régression restante ;
+2. valider les règles métier, les rôles et les transitions avec les responsables de l’OIPI ;
+3. réaliser une recette fonctionnelle complète avec un compte de chaque rôle ;
+4. tester les imports volumineux, les courriels, Pusher, les tâches planifiées et les workers de file d’attente ;
+5. tester une sauvegarde puis une restauration sur un environnement de recette isolé ;
+6. définir et exécuter la stratégie de reprise des données de l’ancienne application ;
+7. effectuer une revue de sécurité et vérifier la configuration de production ;
+8. déployer sur cPanel, contrôler les journaux et préparer un plan de retour arrière.
 
 ## 15. Démarrage du socle Laravel
 
@@ -259,7 +268,74 @@ php artisan migrate
 php artisan serve
 ```
 
-Cette procédure démarre uniquement le socle Laravel. Elle ne constitue pas encore une installation fonctionnelle de RISFM.
+Pour créer les rôles, les référentiels et le compte administrateur initial, configurez d’abord le SMTP dans `.env`, puis lancez `php artisan db:seed`. Le mot de passe temporaire est envoyé à l’adresse définie dans `AdminSeeder` et devra être changé à la première connexion. Le seeder ne réinitialise pas un administrateur déjà présent.
+
+Cette procédure démarre le socle RISFM local. Pour une installation sur cPanel, suivez la procédure de la section suivante et utilisez le modèle `.env.cpanel.example`.
+
+## 16. Installation en production sur cPanel
+
+Le fichier [`.env.cpanel.example`](.env.cpanel.example) est un modèle : il ne contient aucun secret réel. Il faut le copier vers `.env` sur le serveur, puis remplacer toutes les valeurs entre chevrons par celles fournies par cPanel et les services utilisés.
+
+### Préparer l’hébergement
+
+1. Choisir PHP 8.3 et activer les extensions requises par Composer et Laravel, notamment `pdo_mysql`, `mbstring`, `openssl`, `fileinfo`, `xml`, `ctype`, `curl`, `dom`, `gd` et `zip`.
+2. Créer une base MySQL et un utilisateur depuis cPanel, puis lui accorder les droits sur cette base. cPanel préfixe souvent leurs noms par le nom du compte.
+3. Déployer le code dans un répertoire privé, hors de `public_html`, et configurer le domaine pour que sa racine web pointe vers le dossier `public/` de Laravel. Le répertoire racine de l’application ne doit jamais être exposé publiquement.
+4. Installer les dépendances PHP de production :
+
+```bash
+composer install --no-dev --prefer-dist --optimize-autoloader
+```
+
+### Configurer l’application
+
+Depuis la racine du projet sur le serveur :
+
+```bash
+cp .env.cpanel.example .env
+php artisan key:generate
+```
+
+Modifier ensuite `.env` : renseigner le vrai domaine HTTPS, la base et l’utilisateur MySQL cPanel, le SMTP, ainsi que les identifiants Pusher. Garder `APP_ENV=production`, `APP_DEBUG=false` et `SESSION_ENCRYPT=true`. Ne jamais déposer le `.env` dans `public_html`, le committer ou transmettre ses secrets.
+
+Le SMTP doit être opérationnel avant le seeding : le compte administrateur initial reçoit son mot de passe temporaire par courriel. Vérifier aussi auprès de l’hébergeur le nom du serveur SMTP et le port/chiffrement attendus.
+
+Construire les ressources frontend avant le transfert ou sur un environnement Node compatible, puis déployer le répertoire `public/build/` généré :
+
+```bash
+npm ci
+npm run build
+```
+
+### Initialiser et optimiser
+
+Après avoir vérifié les paramètres et sauvegardé la base si elle contient déjà des données :
+
+```bash
+php artisan migrate --force
+php artisan db:seed --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Le seeder crée les rôles, référentiels et l’administrateur initial si nécessaire. Il n’est pas destiné à réinitialiser le mot de passe d’un compte existant. Vérifier que PHP peut écrire dans `storage/` et `bootstrap/cache/`.
+
+### Tâches planifiées et file d’attente
+
+Créer dans cPanel une tâche cron qui appelle `php artisan schedule:run` chaque minute. Exemple à adapter avec le chemin PHP et le chemin absolu du compte cPanel :
+
+```cron
+* * * * * /usr/local/bin/php /home/<COMPTE>/chemin-vers-projet/artisan schedule:run >> /dev/null 2>&1
+```
+
+Cette tâche déclenche notamment les relances de missions et les sauvegardes planifiées définies par l’application. Les imports et notifications utilisent aussi la file d’attente `database` : un worker doit donc être exécuté. Privilégier un gestionnaire de processus fourni par l’hébergeur. Si cPanel ne fournit qu’un cron, configurer un lancement sans chevauchement et vérifier que la commande `flock` est disponible ; adapter les chemins et la durée maximale au contrat d’hébergement :
+
+```cron
+* * * * * flock -n /home/<COMPTE>/chemin-vers-projet/storage/framework/risfm-queue.lock /usr/local/bin/php /home/<COMPTE>/chemin-vers-projet/artisan queue:work database --queue=imports,notifications,default --stop-when-empty --timeout=3600 --tries=3 >> /home/<COMPTE>/chemin-vers-projet/storage/logs/risfm-queue.log 2>&1
+```
+
+Après chaque modification du `.env`, reconstruire le cache de configuration avec `php artisan config:cache`. Consulter les journaux Laravel et les journaux de tâches cron après le déploiement, puis effectuer une recette avec des comptes et données de test avant l’ouverture aux utilisateurs.
 
 ## Confidentialité
 

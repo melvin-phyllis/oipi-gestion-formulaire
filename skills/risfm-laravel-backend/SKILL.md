@@ -92,6 +92,7 @@ Cross-domain work uses a service contract or a domain event. Never call another 
 ## Security invariants
 
 - Authorization is fail-closed: a route or action without an explicit permission mapping is denied.
+- Use the direct `User -> Role -> Permissions` model. Do not create primary-module or secondary-module authorization tables; `group_code` is display metadata only.
 - Attach authentication, permission, and sensitive-action middleware explicitly to routes.
 - Do not infer permissions from controller method names.
 - FormRequests must authorize as well as validate writes.

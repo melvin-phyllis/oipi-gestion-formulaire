@@ -16,6 +16,8 @@
     },
     "dependencies": {
         "@tabler/core": "^1.6.1",
-        "@tabler/icons-webfont": "^3.49.0"
+        "@tabler/icons-webfont": "^3.49.0",
+        "laravel-echo": "^2.6.1",
+        "pusher-js": "^8.6.0"
     }
 }
