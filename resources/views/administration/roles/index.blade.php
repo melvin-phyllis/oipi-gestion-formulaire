@@ -243,7 +243,7 @@
                                                                 value="{{ $permission->permission_code }}"
                                                                 id="{{ $checkboxId }}"
                                                                 @checked($isChecked)
-                                                                onchange="toggleCheckVisual(this, '{{ $role->uuid }}')"
+                                                                data-role-permission-toggle="{{ $role->uuid }}"
                                                             >
                                                             <span class="form-check-label d-block ms-1">
                                                                 <span class="fw-semibold text-dark d-block">{{ $permission->permission_name }}</span>
@@ -267,14 +267,14 @@
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-outline-secondary"
-                                        onclick="checkAllRolePermissions('{{ $role->uuid }}', true)"
+                                        data-role-permissions-all="{{ $role->uuid }}" data-check="true"
                                     >
                                         <i class="ti ti-checks me-1"></i>Tout cocher
                                     </button>
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-outline-secondary"
-                                        onclick="checkAllRolePermissions('{{ $role->uuid }}', false)"
+                                        data-role-permissions-all="{{ $role->uuid }}" data-check="false"
                                     >
                                         <i class="ti ti-square me-1"></i>Tout décocher
                                     </button>
@@ -292,8 +292,18 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-role-permission-toggle]').forEach(function (input) {
+                input.addEventListener('change', function () {
+                    toggleCheckVisual(input, input.dataset.rolePermissionToggle);
+                });
+            });
+            document.querySelectorAll('[data-role-permissions-all]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    checkAllRolePermissions(button.dataset.rolePermissionsAll, button.dataset.check === 'true');
+                });
+            });
             // Activation automatique de l'onglet selon le hash URL (ex. #role-uuid)
             function activateTabFromHash() {
                 const hash = window.location.hash;

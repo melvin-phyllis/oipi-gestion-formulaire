@@ -126,7 +126,7 @@
                 <!-- SOUS-FILTRE EN RETARD -->
                 <div class="d-flex align-items-center gap-3 mt-2 pt-2 border-top">
                     <label class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" name="overdue_only" value="1" @checked(request('overdue_only') === '1') onchange="this.form.submit()">
+                        <input class="form-check-input" type="checkbox" name="overdue_only" value="1" @checked(request('overdue_only') === '1') data-auto-submit>
                         <span class="form-check-label text-danger fw-medium">
                             <i class="ti ti-alert-triangle me-1"></i>
                             Afficher uniquement les missions en retard

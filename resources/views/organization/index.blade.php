@@ -533,7 +533,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         document.addEventListener('DOMContentLoaded', function () {
             // Activation automatique de l'onglet selon le hash URL (ex. #directorate-uuid)
             function activateDirectorateTabFromHash() {

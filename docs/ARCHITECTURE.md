@@ -59,6 +59,7 @@ Une API versionnée ne sera créée que lorsqu’un véritable client externe ou
 ```text
 app/
 ├── Console/Commands/
+├── Contracts/{Administration,Organization,Registry,Audit,Backup}/
 ├── Constants/
 ├── Dto/
 │   ├── Administration/
@@ -87,6 +88,7 @@ app/
 │   │   ├── Audit/
 │   │   └── Backup/
 │   ├── Middleware/
+│   ├── Audit/HttpAuditContextProvider.php
 │   └── Requests/
 │       ├── Authentication/
 │       ├── Administration/
@@ -236,12 +238,25 @@ Toute écriture possède un `FormRequest` et produit un DTO.
 - diffuse les événements lorsque l’état est validé ;
 - ne dépend jamais de `Request`, Blade, `View` ou `RedirectResponse`.
 
+Les échanges entre domaines passent par un contrat de service dans
+`app/Contracts/{Domain}` ou un événement métier. Un service n'injecte pas le
+repository d'un autre domaine. Les lectures de relations Eloquent restent
+dans les repositories, y compris les appels `load()` et `loadMissing()`.
+
+Les services de téléchargement et d'export retournent un DTO décrivant le
+fichier ou son contenu. Le contrôleur rend le template PDF et construit la
+réponse HTTP. Le journal d'audit reçoit son contexte depuis
+`AuditContextProviderInterface` ; seul l'adaptateur HTTP connaît la requête.
+
 ### DTO
 
 - classe immuable suffixée `DTO` ;
 - contient uniquement des données validées et typées ;
 - ne connaît ni HTTP ni Eloquent ;
 - sert de contrat stable entre contrôleur, service et repository.
+
+Un DTO de résultat transporte les identifiants et valeurs utiles, jamais un
+modèle Eloquent mutable.
 
 ### Repository
 
@@ -363,12 +378,30 @@ missions_record_own_result
 attachments_add_own
 analytics_view
 users_manage
+roles_manage
 settings_manage
 backups_manage
 audit_view
 ```
 
-La sécurité est fermée par défaut :
+La sécurité est fermée par défaut.
+
+`users_manage` permet de gérer les comptes ordinaires. `roles_manage` est
+réservé aux administrateurs système et contrôle l'administration des
+habilitations. Un gestionnaire délégué ne peut ni attribuer le rôle
+`SYSTEM_ADMIN`, ni modifier, réactiver, désactiver ou réinitialiser un compte
+administrateur. Les services refont ces contrôles sur les comptes verrouillés
+dans la transaction. Le seeder ciblé `RoleManagementPermissionSeeder` ajoute
+le nouveau droit sans réinitialiser les comptes ni leurs délégations.
+
+`audit_view` est également réservé aux administrateurs système actifs. Une
+ancienne attribution à un autre rôle ne donne aucun accès au journal, à son
+entrée de menu ni aux activités d’audit du tableau de bord. Le service de
+gestion des habilitations refuse toute nouvelle attribution à un autre rôle.
+Le seeder ciblé `AuditAccessPermissionSeeder` désactive les anciennes
+attributions non administratives et conserve l’accès de l’administrateur,
+sans modifier les comptes, mots de passe ou autres permissions. Il est aussi
+appelé par `RolePermissionSeeder` lors de l’initialisation.
 
 - une route protégée déclare explicitement sa permission ;
 - une permission absente ou inconnue refuse l’accès ;
@@ -433,6 +466,7 @@ Un événement ou un job qui lit l’état produit par une transaction ne doit �
 - cookies sécurisés et sessions régénérées à la connexion ;
 - limitation des tentatives de connexion et de récupération ;
 - permissions fermées par défaut ;
+- refus d’intégration dans une iframe via `X-Frame-Options: DENY` et `Content-Security-Policy: frame-ancestors 'none'` ;
 - confirmation récente du mot de passe pour les opérations sensibles ;
 - sauvegardes et pièces sensibles stockées hors du répertoire public ;
 - téléchargement uniquement via un contrôleur autorisé ;
@@ -443,6 +477,28 @@ Un événement ou un job qui lit l’état produit par une transaction ne doit �
 - protection contre l’affectation de masse ;
 - validation serveur obligatoire, même si le navigateur valide déjà ;
 - restauration protégée par permission, réauthentification, phrase de confirmation et audit.
+
+Les limites de connexion se cumulent : 5 requêtes par minute pour un compte (identifiant et e-mail partagent le compteur), et 20 pour une IP, même en changeant d’identifiant. La récupération et la réinitialisation publiques partagent une limite de 3 requêtes par minute par compte et de 10 par IP.
+
+Les vérifications du mot de passe actuel partagent un compteur de 5 requêtes par minute par utilisateur connecté et de 20 par IP : changement de mot de passe, changement de l’e-mail du profil, réinitialisation administrative et restauration. Changer de cible, d’action ou d’IP ne contourne pas le compteur utilisateur. Les modifications ordinaires du profil conservent leur propre limite. Une limite atteinte renvoie `429` avec `Retry-After` ; les réponses JSON contiennent aussi un message français et `retry_after`. Les compteurs doivent utiliser un cache persistant partagé en production, jamais le driver `array`.
+
+Les middlewares globaux `AddContentSecurityPolicy` et `PreventFraming` enveloppent les réponses Laravel, y compris les redirections et erreurs traitées par le framework. Ils ajoutent une CSP couvrant les ressources et `X-Frame-Options: DENY`, sans supprimer les politiques CSP déjà présentes. Les politiques multiples se cumulent : une autre politique plus restrictive peut donc encore bloquer une ressource.
+
+Un nonce aléatoire est renouvelé pour chaque réponse et transmis à Vite, aux balises Blade `script` et `style` autorisées et aux styles générés par ApexCharts. Les réponses HTML sont privées et non stockables (`Cache-Control: no-store, private`) pour éviter la réutilisation du nonce via un cache. Toute nouvelle balise inline de script ou de style doit porter `nonce="{{ Vite::cspNonce() }}"`. Les gestionnaires HTML comme `onclick`, `onchange` et `onsubmit` sont interdits : utiliser les écouteurs JavaScript du bundle ou d’un script noncé. Aucun `unsafe-inline` ni `unsafe-eval` n’est autorisé pour JavaScript.
+
+Les scripts utilisent `strict-dynamic` avec nonce. Les images et polices sont locales, avec les exceptions `data:` et, pour les images, `blob:`. Les connexions sont limitées à l’origine courante et aux deux endpoints TLS du cluster Pusher configuré (`wss://ws-{cluster}.pusher.com` et `https://sockjs-{cluster}.pusher.com`) ; aucun domaine générique ni CDN n’est autorisé. Le client Pusher utilise les transports WebSocket et XHR, sans chargement distant de SockJS. Les objets, iframes, médias, workers et changements de base URL sont interdits ; les formulaires ne peuvent cibler que l’origine courante.
+
+Les attributs `style` restent explicitement autorisés pour préserver les composants Tabler et les mises à jour graphiques. Il s’agit d’un compromis CSS documenté, pas d’une autorisation des scripts inline ; les éléments `style` restent soumis au nonce dans les navigateurs compatibles CSP 3. `style-src` conserve un repli moins strict pour les anciens navigateurs.
+
+En environnement `local` uniquement, l’origine du serveur Vite déclarée dans son fichier `hot` est ajoutée aux sources nécessaires au développement et au WebSocket HMR. Hors de cet environnement, un éventuel fichier `hot` résiduel est ignoré et seuls les assets compilés sont utilisés. En production avec une `APP_URL` HTTPS, `upgrade-insecure-requests` est ajouté.
+
+Les tests PHP vérifient les directives, les nonces, les pages principales et d’erreur ainsi que l’isolation des sources Vite et Pusher. Les tests Chrome (`npm run test:security`, après `npm run build`) exercent les assets compilés, Tabler, ApexCharts et plusieurs interactions réelles, et vérifient le blocage des injections de scripts, d’attributs événementiels, d’`eval`, de styles et de connexions non autorisés. Ils ne prouvent pas la réception d’un événement par le service Pusher externe.
+
+Les pages servies directement par Apache/cPanel, avant ou sans Laravel, doivent être protégées au niveau du serveur. Sur l’hébergement réel, vérifier les en-têtes reçus, l’absence de violations CSP inattendues dans la console et le fonctionnement effectif de Pusher. Ne pas ajouter une deuxième CSP statique incompatible avec les nonces Laravel.
+
+Les imports XLSX passent par `XlsxRowReaderService` : lecture XML en flux de la seule feuille active, sans charger un classeur PhpSpreadsheet ni convertir la feuille en tableau. Les textes partagés sont indexés dans des fichiers temporaires privés, libérés à la fin ou en cas d’erreur. Les dimensions déclarées et les cellules de mise en forme vides ne déclenchent pas l’allocation d’une grille. Les formules ne sont jamais exécutées ; seules leurs valeurs mises en cache dans le fichier sont lues.
+
+Les garde-fous XLSX sont définis dans `config/risfm.php` : 256 Mio décompressés au total, 128 Mio par composant, 1 024 composants, 1 Mio d’index ZIP, 64 feuilles, 64 colonnes contenant des données, 4 Kio par cellule et 1 000 000 de textes partagés. Le nombre de composants et la taille de l’index ZIP sont contrôlés avant l’ouverture par `ZipArchive`. Les unités XML sont également bornées avant leur analyse ; les DTD, entités et relations externes sont refusées. La limite métier de 100 000 lignes reste inchangée et le comptage s’arrête dès qu’elle est dépassée. Un rejet de sécurité marque l’import comme échoué avec un message français, supprime ses fichiers de travail et ne crée aucun formulaire. L’insertion reste atomique et exécutée par la file `imports`. Le répertoire temporaire PHP doit disposer d’espace libre sur cPanel.
 
 ## 13. Scheduler et queues
 

@@ -94,7 +94,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         document.addEventListener('DOMContentLoaded', function () {
             const totalSeconds = @json($retryAfter);
             const deadline = Date.now() + (totalSeconds * 1000);
@@ -143,7 +143,7 @@
 @endpush
 
 @push('styles')
-    <style>
+    <style nonce="{{ Vite::cspNonce() }}">
         .risfm-countdown-clock {
             display: inline-block;
             animation: risfm-countdown-clock-spin 1.5s linear infinite;

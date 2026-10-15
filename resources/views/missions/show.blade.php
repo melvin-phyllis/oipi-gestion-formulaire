@@ -726,7 +726,7 @@
     @endpush
 
     @push('scripts')
-        <script>
+        <script nonce="{{ Vite::cspNonce() }}">
             document.addEventListener('DOMContentLoaded', function () {
                 // Compteurs dynamiques de caractères
                 const countFields = [

@@ -59,7 +59,7 @@
             </button>
         </div>
         <div class="card-body py-3">
-            <form id="filter-form" onsubmit="event.preventDefault(); window.loadBackups(1);">
+            <form id="filter-form">
                 <div class="row g-3 align-items-end">
                     <!-- TYPE DE SAUVEGARDE -->
                     <div class="col-12 col-md-4">
@@ -316,8 +316,12 @@
 @endpush
 
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('filter-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        window.loadBackups(1);
+    });
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const alertsContainer = document.getElementById('alerts-container');
     const tbody = document.getElementById('backups-tbody');
@@ -328,6 +332,19 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentPage = 1;
     let selectedRestoreUuid = null;
     let selectedDeleteUuid = null;
+
+    // Encoder les données externes pour les textes et attributs HTML entre guillemets.
+    function escapeHtml(value) {
+        const entities = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+
+        return String(value ?? '').replace(/[&<>"']/g, character => entities[character]);
+    }
 
     // Helper: Formatter la taille en Ko / Mo
     function formatBytes(bytes) {
@@ -353,14 +370,101 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Helper: Gestion de la limitation de requêtes HTTP 429
+    function handleRateLimit(options) {
+        if (typeof window.risfmHandleRateLimit === 'function') {
+            return window.risfmHandleRateLimit(options);
+        }
+
+        const headerRetryAfter = options.response?.headers
+            ? (options.response.headers.get('Retry-After') || options.response.headers.get('retry-after'))
+            : null;
+
+        let retryAfter = Number(options.data?.retry_after ?? options.data?.retryAfter ?? headerRetryAfter);
+        if (!Number.isFinite(retryAfter) || retryAfter <= 0) {
+            retryAfter = 60;
+        }
+        retryAfter = Math.ceil(retryAfter);
+
+        const message = options.data?.message || `Trop de requêtes ont été effectuées. Veuillez patienter ${retryAfter} seconde(s) avant de renouveler l'action.`;
+
+        const targetButtons = [];
+        if (options.button) targetButtons.push(options.button);
+        if (Array.isArray(options.buttons)) targetButtons.push(...options.buttons);
+        const validButtons = targetButtons.filter((btn) => btn && typeof btn === 'object' && 'disabled' in btn);
+
+        validButtons.forEach((btn) => {
+            if (btn._risfmRateLimitTimer) {
+                clearInterval(btn._risfmRateLimitTimer);
+                btn._risfmRateLimitTimer = null;
+            }
+            btn._isRateLimited = true;
+            btn.disabled = true;
+            btn.classList.remove('btn-loading');
+
+            if (typeof options.renderButton === 'function') {
+                options.renderButton(btn, retryAfter);
+            } else {
+                if (typeof btn._risfmOriginalHtml !== 'string') {
+                    btn._risfmOriginalHtml = btn.innerHTML;
+                }
+                btn.innerHTML = `<i class="ti ti-hourglass-empty me-1" aria-hidden="true"></i> Patienter (${retryAfter}s)`;
+            }
+        });
+
+        if (typeof options.onAlert === 'function') {
+            options.onAlert(message, retryAfter);
+        }
+
+        let remaining = retryAfter;
+        const timer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(timer);
+                validButtons.forEach((btn) => {
+                    btn._risfmRateLimitTimer = null;
+                    btn._isRateLimited = false;
+                    btn.disabled = false;
+                    if (typeof options.restoreButton === 'function') {
+                        options.restoreButton(btn);
+                    } else if (typeof btn._risfmOriginalHtml === 'string') {
+                        btn.innerHTML = btn._risfmOriginalHtml;
+                        delete btn._risfmOriginalHtml;
+                    }
+                });
+                if (typeof options.onFinish === 'function') {
+                    options.onFinish();
+                }
+            } else {
+                validButtons.forEach((btn) => {
+                    if (typeof options.renderButton === 'function') {
+                        options.renderButton(btn, remaining);
+                    } else {
+                        btn.innerHTML = `<i class="ti ti-hourglass-empty me-1" aria-hidden="true"></i> Patienter (${remaining}s)`;
+                    }
+                });
+                if (typeof options.onTick === 'function') {
+                    options.onTick(remaining);
+                }
+            }
+        }, 1000);
+
+        validButtons.forEach((btn) => {
+            btn._risfmRateLimitTimer = timer;
+        });
+
+        return retryAfter;
+    }
+
     // Helper: Afficher une alerte globale
     function showAlert(message, type = 'success', details = null) {
+        type = ['success', 'danger', 'info', 'warning'].includes(type) ? type : 'info';
         alertsContainer.innerHTML = `
             <div class="alert alert-${type} alert-dismissible d-flex align-items-center mb-3" role="alert">
                 <i class="ti ti-${type === 'success' ? 'circle-check' : (type === 'danger' ? 'alert-circle' : 'info-circle')} fs-2 me-2"></i>
                 <div class="flex-fill">
-                    <div>${message}</div>
-                    ${details ? `<div class="small mt-1 opacity-75">${details}</div>` : ''}
+                    <div>${escapeHtml(message)}</div>
+                    ${details ? `<div class="small mt-1 opacity-75">${escapeHtml(details)}</div>` : ''}
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
             </div>
@@ -378,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function () {
             case 'pre_restore':
                 return '<span class="badge bg-warning-lt text-warning"><i class="ti ti-shield-lock me-1"></i>Sécurité avant restauration</span>';
             default:
-                return `<span class="badge bg-light text-secondary">${type}</span>`;
+                return `<span class="badge bg-light text-secondary">${escapeHtml(type)}</span>`;
         }
     }
 
@@ -413,6 +517,18 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (!response.ok) {
+                if (response.status === 429) {
+                    const data = await response.json().catch(() => ({}));
+                    const btnRefresh = document.getElementById('btn-refresh');
+                    const btnApplyFilters = document.getElementById('btn-apply-filters');
+                    handleRateLimit({
+                        response,
+                        data,
+                        buttons: [btnRefresh, btnApplyFilters],
+                        onAlert: (msg) => showAlert(msg, 'warning')
+                    });
+                    throw new Error(data.message || 'Trop de requêtes. Veuillez patienter avant de recharger la liste.');
+                }
                 if (response.status === 403) {
                     throw new Error("Accès refusé : vous n'avez pas la permission de gérer les sauvegardes.");
                 }
@@ -426,7 +542,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <tr>
                     <td colspan="7" class="text-center py-4 text-danger">
                         <i class="ti ti-alert-triangle fs-2 d-block mb-2"></i>
-                        ${error.message || 'Impossible de récupérer la liste des sauvegardes.'}
+                        ${escapeHtml(error.message || 'Impossible de récupérer la liste des sauvegardes.')}
                     </td>
                 </tr>
             `;
@@ -436,6 +552,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Rendu du tableau
     function renderTable(backups, meta) {
+        const integerValue = (value, fallback) => {
+            const parsed = Number(value);
+            return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
+        };
+        meta = {
+            current_page: Math.max(1, integerValue(meta?.current_page, 1)),
+            last_page: Math.max(1, integerValue(meta?.last_page, 1)),
+            per_page: Math.max(1, integerValue(meta?.per_page, 20)),
+            total: integerValue(meta?.total, 0)
+        };
         badgeTotal.textContent = `${meta.total || 0} sauvegarde(s)`;
 
         if (!backups || backups.length === 0) {
@@ -461,14 +587,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let html = '';
         backups.forEach(backup => {
-            const downloadUrl = `{{ url('backups') }}/${backup.uuid}/download`;
+            const downloadUrl = `{{ url('backups') }}/${encodeURIComponent(String(backup.uuid))}/download`;
 
             html += `
                 <tr>
                     <!-- CODE UNIQUE -->
                     <td class="text-nowrap">
                         <span class="badge bg-light text-dark font-monospace fw-bold">
-                            <i class="ti ti-tag me-1 text-primary"></i>${backup.code}
+                            <i class="ti ti-tag me-1 text-primary"></i>${escapeHtml(backup.code)}
                         </span>
                     </td>
 
@@ -477,8 +603,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     <!-- NOM DE FICHIER -->
                     <td>
-                        <span class="font-monospace text-dark small" title="${backup.file_name}">
-                            ${backup.file_name}
+                        <span class="font-monospace text-dark small" title="${escapeHtml(backup.file_name)}">
+                            ${escapeHtml(backup.file_name)}
                         </span>
                     </td>
 
@@ -490,7 +616,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <!-- CREATEUR -->
                     <td>
                         <span class="text-dark small fw-medium">
-                            ${backup.creator_name ? backup.creator_name : '<span class="text-secondary fst-italic">Système</span>'}
+                            ${backup.creator_name ? escapeHtml(backup.creator_name) : '<span class="text-secondary fst-italic">Système</span>'}
                         </span>
                     </td>
 
@@ -503,7 +629,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td class="text-center text-nowrap">
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <!-- TELECHARGER -->
-                            <a href="${downloadUrl}" class="btn btn-sm btn-outline-secondary" title="Télécharger l'archive">
+                            <a href="${escapeHtml(downloadUrl)}" class="btn btn-sm btn-outline-secondary" title="Télécharger l'archive">
                                 <i class="ti ti-download me-1"></i>Télécharger
                             </a>
 
@@ -511,9 +637,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             <button
                                 type="button"
                                 class="btn btn-sm btn-outline-warning btn-open-restore"
-                                data-uuid="${backup.uuid}"
-                                data-code="${backup.code}"
-                                data-file="${backup.file_name}"
+                                data-uuid="${escapeHtml(backup.uuid)}"
+                                data-code="${escapeHtml(backup.code)}"
+                                data-file="${escapeHtml(backup.file_name)}"
                                 data-date="${formatDate(backup.created_at)}"
                                 data-size="${formatBytes(backup.size_bytes)}"
                                 title="Restaurer cette version de la base de données"
@@ -525,9 +651,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             <button
                                 type="button"
                                 class="btn btn-sm btn-outline-danger btn-open-delete"
-                                data-uuid="${backup.uuid}"
-                                data-code="${backup.code}"
-                                data-file="${backup.file_name}"
+                                data-uuid="${escapeHtml(backup.uuid)}"
+                                data-code="${escapeHtml(backup.code)}"
+                                data-file="${escapeHtml(backup.file_name)}"
                                 title="Supprimer la sauvegarde"
                             >
                                 <i class="ti ti-trash"></i>
@@ -663,7 +789,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
-            const result = await response.json();
+            const result = await response.json().catch(() => ({}));
+
+            if (response.status === 429) {
+                window.tabler.Modal.getInstance(document.getElementById('modal-confirm-create'))?.hide();
+                handleRateLimit({
+                    response,
+                    data: result,
+                    buttons: [btnSubmitCreate, btnCreateTrigger],
+                    onAlert: (msg) => showAlert(msg, 'warning')
+                });
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(result.message || 'Impossible de créer la sauvegarde.');
@@ -678,7 +815,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.tabler.Modal.getInstance(document.getElementById('modal-confirm-create'))?.hide();
         } finally {
             btnSubmitCreate.classList.remove('btn-loading');
-            btnSubmitCreate.disabled = false;
+            if (!btnSubmitCreate._isRateLimited) {
+                btnSubmitCreate.disabled = false;
+            }
         }
     });
 
@@ -709,6 +848,11 @@ document.addEventListener('DOMContentLoaded', function () {
             phraseHint.classList.add('d-none');
         }
 
+        if (btnSubmitRestore._isRateLimited) {
+            btnSubmitRestore.disabled = true;
+            return;
+        }
+
         btnSubmitRestore.disabled = !(isPhraseValid && password.length > 0);
     }
 
@@ -735,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
 
         try {
-            const url = `{{ url('backups') }}/${selectedRestoreUuid}/restore`;
+            const url = `{{ url('backups') }}/${encodeURIComponent(selectedRestoreUuid)}/restore`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -750,7 +894,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
             });
 
-            const result = await response.json();
+            const result = await response.json().catch(() => ({}));
+
+            if (response.status === 429) {
+                handleRateLimit({
+                    response,
+                    data: result,
+                    button: btnSubmitRestore,
+                    onAlert: (msg) => {
+                        modalAlert.innerHTML = `
+                            <div class="alert alert-warning d-flex align-items-center mb-3">
+                                <i class="ti ti-hourglass-empty fs-3 me-2"></i>
+                                <div>${escapeHtml(msg)}</div>
+                            </div>
+                        `;
+                    },
+                    onFinish: () => {
+                        modalAlert.innerHTML = '';
+                        validateRestoreInputs();
+                    }
+                });
+                return;
+            }
 
             if (!response.ok) {
                 let errorMsg = result.message || 'Échec de la restauration de la base de données.';
@@ -768,7 +933,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             let successDetails = '';
             if (result.safety_backup) {
-                successDetails = `Une sauvegarde de sécurité préalable a été créée : <strong>${result.safety_backup.code}</strong> (${result.safety_backup.file_name}).`;
+                successDetails = `Une sauvegarde de sécurité préalable a été créée : ${result.safety_backup.code} (${result.safety_backup.file_name}).`;
             }
 
             showAlert(result.message || 'La base de données a été restaurée avec succès.', 'success', successDetails);
@@ -777,7 +942,7 @@ document.addEventListener('DOMContentLoaded', function () {
             modalAlert.innerHTML = `
                 <div class="alert alert-danger d-flex align-items-center mb-3">
                     <i class="ti ti-alert-circle fs-3 me-2"></i>
-                    <div>${error.message}</div>
+                    <div>${escapeHtml(error.message)}</div>
                 </div>
             `;
         } finally {
@@ -786,7 +951,9 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('btn-close-restore-top').disabled = false;
             restorePhraseInput.disabled = false;
             restorePasswordInput.disabled = false;
-            validateRestoreInputs();
+            if (!btnSubmitRestore._isRateLimited) {
+                validateRestoreInputs();
+            }
         }
     });
 
@@ -799,7 +966,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btnSubmitDelete.disabled = true;
 
         try {
-            const url = `{{ url('backups') }}/${selectedDeleteUuid}`;
+            const url = `{{ url('backups') }}/${encodeURIComponent(selectedDeleteUuid)}`;
             const response = await fetch(url, {
                 method: 'DELETE',
                 headers: {
@@ -810,7 +977,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
-            const result = await response.json();
+            const result = await response.json().catch(() => ({}));
+
+            if (response.status === 429) {
+                handleRateLimit({
+                    response,
+                    data: result,
+                    button: btnSubmitDelete,
+                    onAlert: (msg) => {
+                        document.getElementById('delete-modal-alert').innerHTML = `
+                            <div class="alert alert-warning small mb-0">${escapeHtml(msg)}</div>
+                        `;
+                    },
+                    onFinish: () => {
+                        document.getElementById('delete-modal-alert').innerHTML = '';
+                    }
+                });
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(result.message || 'Impossible de supprimer la sauvegarde.');
@@ -821,11 +1005,13 @@ document.addEventListener('DOMContentLoaded', function () {
             window.loadBackups(currentPage);
         } catch (error) {
             document.getElementById('delete-modal-alert').innerHTML = `
-                <div class="alert alert-danger small mb-0">${error.message}</div>
+                <div class="alert alert-danger small mb-0">${escapeHtml(error.message)}</div>
             `;
         } finally {
             btnSubmitDelete.classList.remove('btn-loading');
-            btnSubmitDelete.disabled = false;
+            if (!btnSubmitDelete._isRateLimited) {
+                btnSubmitDelete.disabled = false;
+            }
         }
     });
 

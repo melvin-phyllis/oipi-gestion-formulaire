@@ -86,7 +86,7 @@
 
     @if ($errors->has('import_file'))
         @push('scripts')
-            <script>
+            <script nonce="{{ Vite::cspNonce() }}">
                 document.addEventListener('DOMContentLoaded', function () {
                     const modalEl = document.getElementById('modal-import-missing-forms');
                     if (modalEl && window.bootstrap && window.bootstrap.Modal) {

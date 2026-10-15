@@ -183,7 +183,7 @@
 
 @if (session('temporary_password'))
     @push('scripts')
-        <script>
+        <script nonce="{{ Vite::cspNonce() }}">
             document.addEventListener('DOMContentLoaded', function () {
                 const container = document.getElementById('temporary-password-container');
                 if (!container) return;

@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "test:security": "node --test tests/Browser/*.test.mjs",
         "dev": "vite"
     },
     "devDependencies": {

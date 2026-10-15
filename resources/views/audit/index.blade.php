@@ -454,7 +454,7 @@
                                 <button
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('meta-json-{{ $log->id }}').innerText)"
+                                    data-copy-target="meta-json-{{ $log->id }}"
                                 >
                                     <i class="ti ti-copy me-1"></i>Copier le JSON
                                 </button>

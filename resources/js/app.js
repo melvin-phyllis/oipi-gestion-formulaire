@@ -7,6 +7,14 @@ import './theme-switcher';
 window.tabler = tabler;
 window.ApexCharts = ApexCharts;
 
+const cspNonce = document.querySelector('meta[property="csp-nonce"]')?.nonce;
+if (cspNonce) {
+    window.Apex = {
+        ...window.Apex,
+        chart: { ...window.Apex?.chart, nonce: cspNonce },
+    };
+}
+
 const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
 
 if (pusherKey) {
@@ -16,6 +24,7 @@ if (pusherKey) {
         key: pusherKey,
         cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'eu',
         forceTLS: true,
+        enabledTransports: ['ws', 'xhr_streaming', 'xhr_polling'],
         authEndpoint: '/broadcasting/auth',
         withCredentials: true,
     });
@@ -23,6 +32,25 @@ if (pusherKey) {
 
 const sidebarIsFolded = () =>
     document.documentElement.getAttribute('data-bs-sidebar')?.startsWith('folded') ?? false;
+
+document.addEventListener('change', (event) => {
+    const input = event.target.closest?.('[data-auto-submit]');
+    input?.form?.submit();
+});
+
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest?.('[data-copy-target]');
+    if (!button) return;
+
+    const target = document.getElementById(button.dataset.copyTarget);
+    if (!target) return;
+
+    try {
+        await navigator.clipboard.writeText(target.innerText);
+    } catch (error) {
+        console.warn('La copie dans le presse-papier est indisponible.');
+    }
+});
 
 const syncSidebarToggle = (folded = sidebarIsFolded()) => {
     const label = folded ? 'Agrandir la barre latérale' : 'Réduire la barre latérale';
@@ -354,3 +382,8 @@ document.addEventListener('click', (e) => {
         hideIcon.classList.toggle('d-none', !isPassword);
     }
 });
+
+import { risfmHandleRateLimit } from './rate-limiter.js';
+
+export { risfmHandleRateLimit };
+window.risfmHandleRateLimit = risfmHandleRateLimit;

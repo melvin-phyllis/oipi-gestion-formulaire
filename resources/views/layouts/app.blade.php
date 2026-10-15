@@ -4,13 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta property="csp-nonce" nonce="{{ Vite::cspNonce() }}">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 
     <title>@yield('title', 'RISFM') | OIPI</title>
     <link rel="icon" type="image/png" href="{{ asset('images/oipi-favicon.png') }}">
 
     @include('partials.theme-initializer')
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         (() => {
             try {
                 if (localStorage.getItem('tabler-sidebar') === 'folded-hover') {
@@ -186,7 +187,7 @@
                                 </li>
                             @endcan
 
-                            @canany(['users_manage', 'settings_manage', 'backups_manage'])
+                            @canany(['users_manage', 'roles_manage', 'settings_manage', 'backups_manage'])
                                 <li class="nav-section-title">Administration</li>
                             @endcanany
 
@@ -199,6 +200,9 @@
                                         <span class="nav-link-title">Utilisateurs</span>
                                     </a>
                                 </li>
+                            @endcan
+
+                            @can('roles_manage')
                                 <li class="nav-item {{ request()->routeIs('roles.*') ? 'active' : '' }}">
                                     <a class="nav-link" href="{{ route('roles.index') }}">
                                         <span class="nav-link-icon">

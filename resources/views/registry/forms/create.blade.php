@@ -574,7 +574,7 @@
 
     @if ($canRegisterFound)
         @push('scripts')
-            <script>
+            <script nonce="{{ Vite::cspNonce() }}">
                 document.addEventListener('DOMContentLoaded', function () {
                     const titleEl = document.getElementById('registry-create-page-title');
                     const subtitleEl = document.getElementById('registry-create-page-subtitle');

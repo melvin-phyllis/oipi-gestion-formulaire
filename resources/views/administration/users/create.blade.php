@@ -54,7 +54,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script nonce="{{ Vite::cspNonce() }}">
         document.addEventListener('DOMContentLoaded', function () {
             const generateBtn = document.getElementById('btn-generate-username');
             if (!generateBtn) return;
@@ -62,9 +62,52 @@
             const usernameInput = document.getElementById('username');
             const lastNameInput = document.getElementById('last_name');
             const firstNamesInput = document.getElementById('first_names');
-            const spinner = document.getElementById('btn-generate-username-spinner');
-            const icon = document.getElementById('btn-generate-username-icon');
-            const btnText = document.getElementById('btn-generate-username-text');
+
+            const getIcon = function () {
+                return document.getElementById('btn-generate-username-icon');
+            };
+            const getSpinner = function () {
+                return document.getElementById('btn-generate-username-spinner');
+            };
+            const getBtnText = function () {
+                return document.getElementById('btn-generate-username-text');
+            };
+
+            function setGenerateBtnLoading() {
+                generateBtn.disabled = true;
+                const iconEl = getIcon();
+                const spinnerEl = getSpinner();
+                const textEl = getBtnText();
+                if (iconEl) iconEl.classList.add('d-none');
+                if (spinnerEl) spinnerEl.classList.remove('d-none');
+                if (textEl) textEl.textContent = 'Génération en cours...';
+            }
+
+            function setGenerateBtnRateLimited(remaining) {
+                generateBtn.disabled = true;
+                const iconEl = getIcon();
+                const spinnerEl = getSpinner();
+                const textEl = getBtnText();
+                if (spinnerEl) spinnerEl.classList.add('d-none');
+                if (iconEl) {
+                    iconEl.className = 'ti ti-hourglass-empty me-1';
+                    iconEl.classList.remove('d-none');
+                }
+                if (textEl) textEl.textContent = `Patienter (${remaining}s)`;
+            }
+
+            function resetGenerateBtn() {
+                generateBtn.disabled = false;
+                const iconEl = getIcon();
+                const spinnerEl = getSpinner();
+                const textEl = getBtnText();
+                if (spinnerEl) spinnerEl.classList.add('d-none');
+                if (iconEl) {
+                    iconEl.className = 'ti ti-sparkles me-1';
+                    iconEl.classList.remove('d-none');
+                }
+                if (textEl) textEl.textContent = 'Générer l’identifiant';
+            }
 
             const errorFields = {
                 last_name: {
@@ -93,6 +136,81 @@
                 });
             }
 
+            function handleRateLimit(options) {
+                if (typeof window.risfmHandleRateLimit === 'function') {
+                    return window.risfmHandleRateLimit(options);
+                }
+
+                const headerRetryAfter = options.response?.headers
+                    ? (typeof options.response.headers.get === 'function'
+                        ? (options.response.headers.get('Retry-After') || options.response.headers.get('retry-after'))
+                        : (options.response.headers['Retry-After'] || options.response.headers['retry-after']))
+                    : null;
+
+                let retryAfter = Number(options.data?.retry_after ?? options.data?.retryAfter ?? headerRetryAfter);
+                if (!Number.isFinite(retryAfter) || retryAfter <= 0) {
+                    retryAfter = 60;
+                }
+                retryAfter = Math.ceil(retryAfter);
+
+                const message = options.data?.message || `Trop de requêtes ont été effectuées. Veuillez patienter ${retryAfter} seconde(s) avant de renouveler l'action.`;
+
+                const btn = options.button;
+                if (btn) {
+                    if (btn._risfmRateLimitTimer) {
+                        clearInterval(btn._risfmRateLimitTimer);
+                        btn._risfmRateLimitTimer = null;
+                    }
+                    btn._isRateLimited = true;
+                    btn.disabled = true;
+
+                    if (typeof options.renderButton === 'function') {
+                        options.renderButton(btn, retryAfter);
+                    } else {
+                        if (typeof btn._risfmOriginalHtml !== 'string') {
+                            btn._risfmOriginalHtml = btn.innerHTML;
+                        }
+                        btn.innerHTML = `<i class="ti ti-hourglass-empty me-1" aria-hidden="true"></i> Patienter (${retryAfter}s)`;
+                    }
+
+                    let remaining = retryAfter;
+                    const timer = setInterval(function () {
+                        remaining--;
+                        if (remaining <= 0) {
+                            clearInterval(timer);
+                            btn._risfmRateLimitTimer = null;
+                            btn._isRateLimited = false;
+                            btn.disabled = false;
+                            if (typeof options.restoreButton === 'function') {
+                                options.restoreButton(btn);
+                            } else if (typeof btn._risfmOriginalHtml === 'string') {
+                                btn.innerHTML = btn._risfmOriginalHtml;
+                                delete btn._risfmOriginalHtml;
+                            }
+                            if (typeof options.onFinish === 'function') {
+                                options.onFinish();
+                            }
+                        } else {
+                            if (typeof options.renderButton === 'function') {
+                                options.renderButton(btn, remaining);
+                            } else {
+                                btn.innerHTML = `<i class="ti ti-hourglass-empty me-1" aria-hidden="true"></i> Patienter (${remaining}s)`;
+                            }
+                            if (typeof options.onTick === 'function') {
+                                options.onTick(remaining);
+                            }
+                        }
+                    }, 1000);
+                    btn._risfmRateLimitTimer = timer;
+                }
+
+                if (typeof options.onAlert === 'function') {
+                    options.onAlert(message, retryAfter);
+                }
+
+                return retryAfter;
+            }
+
             [lastNameInput, firstNamesInput].forEach(function (input) {
                 if (!input) return;
                 input.addEventListener('input', function () {
@@ -112,10 +230,7 @@
                 const firstNames = firstNamesInput ? firstNamesInput.value.trim() : '';
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-                generateBtn.disabled = true;
-                if (icon) icon.classList.add('d-none');
-                if (spinner) spinner.classList.remove('d-none');
-                if (btnText) btnText.textContent = 'Génération en cours...';
+                setGenerateBtnLoading();
 
                 try {
                     const response = await fetch("{{ route('users.username-suggestion') }}", {
@@ -140,6 +255,28 @@
                             usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
                             usernameInput.focus();
                         }
+                    } else if (response.status === 429) {
+                        const data = await response.json().catch(function () { return {}; });
+
+                        handleRateLimit({
+                            response,
+                            data,
+                            button: generateBtn,
+                            renderButton: function (btn, remaining) {
+                                setGenerateBtnRateLimited(remaining);
+                            },
+                            restoreButton: function (btn) {
+                                resetGenerateBtn();
+                            },
+                            onAlert: function (msg) {
+                                const usernameTarget = errorFields.username;
+                                if (usernameTarget && usernameTarget.errorEl) {
+                                    usernameTarget.errorEl.textContent = msg;
+                                    usernameTarget.errorEl.classList.add('d-block');
+                                }
+                            }
+                        });
+                        return;
                     } else if (response.status === 422) {
                         const data = await response.json();
                         if (data && data.errors) {
@@ -170,10 +307,9 @@
                         usernameTarget.errorEl.classList.add('d-block');
                     }
                 } finally {
-                    generateBtn.disabled = false;
-                    if (spinner) spinner.classList.add('d-none');
-                    if (icon) icon.classList.remove('d-none');
-                    if (btnText) btnText.textContent = 'Générer l’identifiant';
+                    if (!generateBtn._isRateLimited) {
+                        resetGenerateBtn();
+                    }
                 }
             });
         });

@@ -238,7 +238,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
     const emailInput = document.getElementById('email');
     const currentPasswordInput = document.getElementById('current_password');

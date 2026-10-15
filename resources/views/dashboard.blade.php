@@ -869,7 +869,7 @@
 
 @if ($monthlyTrend->isNotEmpty())
     @push('scripts')
-        <script>
+        <script nonce="{{ Vite::cspNonce() }}">
             (() => {
                 const chartContainer = document.getElementById('chart-monthly-trend');
                 const chartError = document.querySelector('[data-trend-chart-error]');

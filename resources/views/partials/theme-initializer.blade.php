@@ -1,4 +1,4 @@
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
     (() => {
         const storageKey = 'risfm-theme';
 
