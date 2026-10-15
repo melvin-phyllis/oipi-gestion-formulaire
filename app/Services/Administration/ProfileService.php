@@ -22,7 +22,7 @@ final class ProfileService
     ): UserModel {
         $changedFields = $this->changedFields($user, $data);
         if ($changedFields === []) {
-            return $user->loadMissing(['role', 'service.directorate']);
+            return $this->users->repo_loadForProfile($user);
         }
 
         if (in_array('email', $changedFields, true)

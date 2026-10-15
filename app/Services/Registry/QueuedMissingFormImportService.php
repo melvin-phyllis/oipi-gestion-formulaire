@@ -2,6 +2,7 @@
 
 namespace App\Services\Registry;
 
+use App\Contracts\Administration\UserDirectoryServiceInterface;
 use App\Dto\Registry\ImportMissingFormsDTO;
 use App\Enums\Registry\FormPriority;
 use App\Enums\Registry\RegistryImportStatus;
@@ -11,7 +12,6 @@ use App\Jobs\Registry\ProcessMissingFormImport;
 use App\Models\Administration\UserModel;
 use App\Models\Registry\MissingFormImportModel;
 use App\Models\Registry\TitleTypeModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use App\Repositories\Interfaces\Registry\MissingFormImportRepositoryInterface;
 use App\Repositories\Interfaces\Registry\MissingFormRepositoryInterface;
 use App\Repositories\Interfaces\Registry\RegistryReferenceRepositoryInterface;
@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use RuntimeException;
 use SplFileObject;
 use Throwable;
@@ -47,7 +46,8 @@ final class QueuedMissingFormImportService
         private readonly MissingFormImportRepositoryInterface $imports,
         private readonly MissingFormRepositoryInterface $forms,
         private readonly RegistryReferenceRepositoryInterface $references,
-        private readonly UserRepositoryInterface $users,
+        private readonly UserDirectoryServiceInterface $users,
+        private readonly XlsxRowReaderService $xlsx,
     ) {}
 
     public function srv_queue(
@@ -108,7 +108,7 @@ final class QueuedMissingFormImportService
 
         $this->imports->repo_markProcessing($import);
         $this->broadcastProgress($import);
-        $actor = $this->users->repo_findByCodeUnique($import->created_by_user_code_unique);
+        $actor = $this->users->srv_findByCodeUnique($import->created_by_user_code_unique);
         $disk = Storage::disk($import->disk);
         $sourcePath = $disk->path($import->file_path);
         $normalizedRelativePath = $import->file_path.'.normalized.csv';
@@ -144,6 +144,14 @@ final class QueuedMissingFormImportService
             });
 
             MissingFormsImported::dispatch($processedRows, $actor->uuid);
+            $this->broadcastProgress($import);
+            $disk->delete([$import->file_path, $normalizedRelativePath]);
+        } catch (ValidationException $exception) {
+            $this->imports->repo_markFailed(
+                $import,
+                $import->processed_rows,
+                array_slice($exception->errors()['import_file'] ?? [$exception->getMessage()], 0, 50),
+            );
             $this->broadcastProgress($import);
             $disk->delete([$import->file_path, $normalizedRelativePath]);
         } catch (Throwable $exception) {
@@ -410,21 +418,13 @@ final class QueuedMissingFormImportService
             return;
         }
 
-        try {
-            $reader = IOFactory::createReaderForFile($filePath);
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($filePath);
-
-            foreach ($spreadsheet->getActiveSheet()->toArray(null, true, true, false) as $index => $row) {
-                yield $index + 1 => $row;
-            }
-
-            $spreadsheet->disconnectWorksheets();
-        } catch (Throwable) {
+        if ($extension !== 'xlsx') {
             throw ValidationException::withMessages([
                 'import_file' => 'Le fichier ne peut pas être lu. Vérifiez qu’il s’agit d’un fichier CSV ou XLSX valide.',
             ]);
         }
+
+        yield from $this->xlsx->srv_rows($filePath);
     }
 
     /**
@@ -600,10 +600,16 @@ final class QueuedMissingFormImportService
     private function countDataRows(string $filePath): int
     {
         $nonEmptyRows = 0;
+        $maxRows = max(1, (int) config('risfm.registry_import.max_rows', 100000));
 
         foreach ($this->rowIterator($filePath) as $row) {
             if (! $this->rowIsEmpty($row)) {
                 $nonEmptyRows++;
+                if ($nonEmptyRows > $maxRows + 1) {
+                    throw ValidationException::withMessages([
+                        'import_file' => "Le fichier dépasse la limite de {$maxRows} lignes de données.",
+                    ]);
+                }
             }
         }
 

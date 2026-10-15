@@ -2,10 +2,10 @@
 
 namespace App\Services\Authentication;
 
+use App\Contracts\Administration\UserAccountServiceInterface;
 use App\Dto\Authentication\LoginDTO;
 use App\Events\Authentication\AuthenticationFailed;
 use App\Models\Administration\UserModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -13,13 +13,13 @@ use Illuminate\Validation\ValidationException;
 final class AuthenticationService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $users,
+        private readonly UserAccountServiceInterface $users,
     ) {}
 
     /** @throws ValidationException */
     public function srv_authenticate(LoginDTO $credentials): UserModel
     {
-        $user = $this->users->repo_findForAuthentication($credentials->login);
+        $user = $this->users->srv_findForAuthentication($credentials->login);
 
         if (
             ! $user instanceof UserModel
@@ -39,13 +39,13 @@ final class AuthenticationService
         }
 
         if (Hash::needsRehash($user->password)) {
-            $this->users->repo_updatePasswordHash(
+            $this->users->srv_updatePasswordHash(
                 $user,
                 Hash::make($credentials->password),
             );
         }
 
-        $this->users->repo_markLoggedIn($user);
+        $this->users->srv_markLoggedIn($user);
 
         return $user;
     }

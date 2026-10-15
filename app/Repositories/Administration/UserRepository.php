@@ -17,6 +17,16 @@ use Illuminate\Support\Str;
 
 final class UserRepository implements UserRepositoryInterface
 {
+    public function repo_loadForProfile(UserModel $user): UserModel
+    {
+        return $user->loadMissing(['role', 'service.directorate']);
+    }
+
+    public function repo_loadRole(UserModel $user): UserModel
+    {
+        return $user->loadMissing('role');
+    }
+
     public function repo_paginate(
         UserFiltersDTO $filters,
         int $perPage = 15,
@@ -164,10 +174,41 @@ final class UserRepository implements UserRepositoryInterface
     public function repo_isActiveSystemAdministrator(UserModel $user): bool
     {
         return $user->is_active
+            && ! $user->trashed()
             && RoleModel::query()
                 ->where('role_code_unique', $user->role_code_unique)
                 ->where('role_code', RoleCode::SystemAdmin->value)
+                ->where('is_active', true)
                 ->exists();
+    }
+
+    public function repo_hasSystemAdministratorRole(UserModel $user): bool
+    {
+        return RoleModel::withTrashed()
+            ->where('role_code_unique', $user->role_code_unique)
+            ->where('role_code', RoleCode::SystemAdmin->value)
+            ->exists();
+    }
+
+    public function repo_lockForManagement(array $userCodes): Collection
+    {
+        return UserModel::query()
+            ->whereIn('user_code_unique', $userCodes)
+            ->orderBy('user_code_unique')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('user_code_unique');
+    }
+
+    public function repo_lockActiveSystemAdministrators(): Collection
+    {
+        return UserModel::query()
+            ->where('is_active', true)
+            ->whereHas('role', fn (Builder $query): Builder => $query
+                ->where('role_code', RoleCode::SystemAdmin->value))
+            ->orderBy('user_code_unique')
+            ->lockForUpdate()
+            ->get();
     }
 
     public function repo_countActiveSystemAdministrators(): int

@@ -41,7 +41,7 @@ final class RolePermissionManagementTest extends TestCase
         $this->administrator = $this->createUserForRole(RoleCode::SystemAdmin);
     }
 
-    public function test_role_permission_management_requires_the_users_manage_permission(): void
+    public function test_role_permission_management_requires_the_roles_manage_permission(): void
     {
         $searchAgent = $this->createUserForRole(RoleCode::SearchAgent);
 
@@ -108,8 +108,10 @@ final class RolePermissionManagementTest extends TestCase
             ->put(route('roles.permissions.update', $role), [
                 'permissions' => [PermissionCode::RegistryView->value],
             ])
-            ->assertRedirect(route('roles.index').'#role-'.$role->uuid)
-            ->assertSessionHasNoErrors();
+            ->assertForbidden();
+
+        $this->actingAsCurrent($searchAgent)->get(route('users.index'))->assertOk();
+        $this->assertSame([PermissionCode::UsersManage->value], $this->activePermissionCodes($role));
     }
 
     public function test_system_administrator_permissions_are_protected(): void

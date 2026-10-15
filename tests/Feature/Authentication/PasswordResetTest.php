@@ -8,8 +8,11 @@ use App\Models\Administration\UserModel;
 use App\Notifications\Authentication\ResetPasswordNotification;
 use Database\Seeders\Administration\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Routing\UrlGenerator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use RuntimeException;
 use Tests\TestCase;
 
 final class PasswordResetTest extends TestCase
@@ -113,6 +116,53 @@ final class PasswordResetTest extends TestCase
         ]);
 
         $this->assertTrue(Hash::check('CurrentSecret123!', $user->fresh()->password));
+    }
+
+    public function test_reset_mail_uses_configured_origin_despite_a_forged_request_host(): void
+    {
+        config()->set('app.url', 'https://risfm.oipi.test');
+        $user = $this->createUser();
+
+        $this->post('http://attacker.example/forgot-password', [
+            'email' => $user->email,
+        ])->assertRedirect();
+
+        Notification::assertSentTo($user, ResetPasswordNotification::class,
+            function (ResetPasswordNotification $notification) use ($user): bool {
+                $mail = $notification->toMail($user);
+                $this->assertStringStartsWith('https://risfm.oipi.test/reset-password/', $mail->actionUrl);
+                $this->assertStringNotContainsString('attacker.example', $mail->actionUrl);
+                parse_str((string) parse_url($mail->actionUrl, PHP_URL_QUERY), $query);
+                $this->assertSame($user->email, $query['email']);
+
+                return true;
+            },
+        );
+    }
+
+    public function test_reset_url_preserves_configured_port_and_installation_path_without_changing_other_urls(): void
+    {
+        config()->set('app.url', 'http://localhost:8000/risfm');
+        $user = $this->createUser();
+        $urls = app(UrlGenerator::class);
+        $urls->setRequest(Request::create('http://attacker.example/forgot-password'));
+        $originalLoginUrl = $urls->route('login');
+
+        $mail = (new ResetPasswordNotification('test-token'))->toMail($user);
+
+        $this->assertStringStartsWith('http://localhost:8000/risfm/reset-password/test-token?', $mail->actionUrl);
+        $this->assertSame($originalLoginUrl, $urls->route('login'));
+    }
+
+    public function test_invalid_configured_origin_does_not_fall_back_to_the_request_host(): void
+    {
+        config()->set('app.url', '');
+        $user = $this->createUser();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('APP_URL');
+
+        (new ResetPasswordNotification('test-token'))->toMail($user);
     }
 
     /** @param array<string, mixed> $attributes */

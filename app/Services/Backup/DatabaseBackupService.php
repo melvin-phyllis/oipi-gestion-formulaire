@@ -4,6 +4,7 @@ namespace App\Services\Backup;
 
 use App\Contracts\Backup\ApplicationMaintenanceInterface;
 use App\Contracts\Backup\DatabaseProcessInterface;
+use App\Dto\Backup\BackupDownloadDTO;
 use App\Dto\Backup\BackupFileDTO;
 use App\Dto\Backup\BackupFiltersDTO;
 use App\Dto\Backup\RestoreBackupDTO;
@@ -26,7 +27,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 final class DatabaseBackupService
@@ -53,20 +53,12 @@ final class DatabaseBackupService
         return $this->create(BackupType::Scheduled);
     }
 
-    public function srv_download(DatabaseBackupModel $backup, UserModel $actor): StreamedResponse
+    public function srv_download(DatabaseBackupModel $backup, UserModel $actor): BackupDownloadDTO
     {
         $this->verifyIntegrity($backup);
         DatabaseBackupDownloaded::dispatch($backup->uuid, $actor->uuid);
 
-        return $this->disk($backup->disk)->download(
-            $backup->file_path,
-            $backup->file_name,
-            [
-                'Content-Type' => 'application/gzip',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-                'X-Content-Type-Options' => 'nosniff',
-            ],
-        );
+        return new BackupDownloadDTO($backup->disk, $backup->file_path, $backup->file_name);
     }
 
     public function srv_delete(DatabaseBackupModel $backup, UserModel $actor): void

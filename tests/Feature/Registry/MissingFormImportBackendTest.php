@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Registry;
 
+use App\Dto\Registry\ImportMissingFormsDTO;
 use App\Enums\Administration\RoleCode;
 use App\Enums\Audit\AuditAction;
 use App\Enums\Registry\FormPriority;
 use App\Enums\Registry\FormStatus;
 use App\Enums\Registry\RegistryImportStatus;
 use App\Events\Registry\MissingFormImportProgressUpdated;
+use App\Events\Registry\MissingFormsImported;
 use App\Jobs\Registry\ProcessMissingFormImport;
 use App\Models\Administration\RoleModel;
 use App\Models\Administration\UserModel;
@@ -15,6 +17,7 @@ use App\Models\Audit\AuditLogModel;
 use App\Models\Registry\MissingFormImportModel;
 use App\Models\Registry\MissingFormModel;
 use App\Models\Registry\TitleTypeModel;
+use App\Services\Registry\QueuedMissingFormImportService;
 use Database\Seeders\Administration\PermissionSeeder;
 use Database\Seeders\Administration\RolePermissionSeeder;
 use Database\Seeders\Administration\RoleSeeder;
@@ -29,6 +32,7 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
+use ZipArchive;
 
 final class MissingFormImportBackendTest extends TestCase
 {
@@ -369,6 +373,130 @@ final class MissingFormImportBackendTest extends TestCase
         } finally {
             @unlink($path);
         }
+    }
+
+    public function test_xlsx_row_limit_is_checked_before_any_form_is_inserted(): void
+    {
+        config()->set('risfm.registry_import.max_rows', 2);
+        $import = $this->processXlsx([
+            ['title_type', 'form_year', 'form_number'],
+            ['BRV', 2020, 'B-000001'],
+            ['BRV', 2020, 'B-000002'],
+            ['BRV', 2020, 'B-000003'],
+        ]);
+
+        $this->assertRejectedImport($import, 'limite de 2 lignes');
+    }
+
+    public function test_csv_row_count_also_stops_at_the_configured_limit(): void
+    {
+        config()->set('risfm.registry_import.max_rows', 1);
+        $file = UploadedFile::fake()->createWithContent('too-many.csv', "title_type;form_year;form_number\nBRV;2020;B-000001\nBRV;2020;B-000002");
+        $this->actingAsCurrent($this->administrator)->post(route('registry.forms.import'), ['import_file' => $file])
+            ->assertRedirect(route('registry.forms.index'))->assertSessionHasNoErrors();
+
+        $import = MissingFormImportModel::query()->sole();
+        $this->assertSame(RegistryImportStatus::Failed, $import->status);
+        $this->assertStringContainsString('limite de 1 lignes', $import->errors[0]);
+        $this->assertDatabaseCount('reg_missing_form_models', 0);
+    }
+
+    public function test_compressed_xlsx_expansion_is_rejected_with_a_user_facing_error_and_cleaned_up(): void
+    {
+        config()->set('risfm.registry_import.xlsx.max_part_bytes', 65536);
+        $import = $this->processXlsx($this->xlsxRows(), function (ZipArchive $zip): void {
+            $zip->addFromString('unused-padding.bin', str_repeat('A', 65537));
+        });
+
+        $this->assertRejectedImport($import, 'volumineux une fois décompressé');
+    }
+
+    public function test_malformed_xlsx_cannot_import_an_initial_valid_row(): void
+    {
+        $import = $this->processXlsx($this->xlsxRows(), function (ZipArchive $zip): void {
+            $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertIsString($xml);
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('</worksheet>', '<invalid>', $xml));
+        });
+
+        $this->assertRejectedImport($import, 'ne peut pas être lu');
+    }
+
+    public function test_malicious_xlsx_xml_is_rejected_without_exposing_entity_contents(): void
+    {
+        $import = $this->processXlsx($this->xlsxRows(), function (ZipArchive $zip): void {
+            $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertIsString($xml);
+            $body = preg_replace('/<\?xml[^>]*\?>/', '', $xml);
+            $this->assertIsString($body);
+            $zip->addFromString('xl/worksheets/sheet1.xml', '<!DOCTYPE worksheet [<!ENTITY probe SYSTEM "file:///etc/passwd">]>'.$body);
+        });
+
+        $this->assertRejectedImport($import, 'structure XML non autorisée');
+    }
+
+    public function test_sparse_xlsx_dimensions_do_not_create_millions_of_rows_or_cells(): void
+    {
+        $import = $this->processXlsx($this->xlsxRows(), function (ZipArchive $zip): void {
+            $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertIsString($xml);
+            $xml = preg_replace('/<dimension[^>]*\/>/', '<dimension ref="A1:XFD1048576"/>', $xml);
+            $zip->addFromString('xl/worksheets/sheet1.xml', str_replace('</sheetData>', '<row r="1048576"><c r="XFD1048576" s="1"/></row></sheetData>', $xml));
+        });
+
+        $this->assertSame(RegistryImportStatus::Completed, $import->status);
+        $this->assertSame(1, $import->total_rows);
+        $this->assertSame(1, $import->imported_rows);
+        $this->assertDatabaseHas('reg_missing_form_models', ['form_number' => 'B-2020-000777']);
+        Storage::disk('local')->assertMissing($import->file_path);
+    }
+
+    /** @return list<list<string|int>> */
+    private function xlsxRows(): array
+    {
+        return [['title_type', 'form_year', 'form_number'], ['BRV', 2020, 'B-2020-000777']];
+    }
+
+    /** @param list<list<string|int>> $rows */
+    private function processXlsx(array $rows, ?callable $mutate = null): MissingFormImportModel
+    {
+        Queue::fake();
+        Event::fake([MissingFormsImported::class, MissingFormImportProgressUpdated::class]);
+        $source = Storage::disk('local')->path('security-test-input.xlsx');
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray($rows);
+        (new Xlsx($spreadsheet))->save($source);
+        $spreadsheet->disconnectWorksheets();
+
+        try {
+            if ($mutate !== null) {
+                $zip = new ZipArchive;
+                $this->assertTrue($zip->open($source));
+                try {
+                    $mutate($zip);
+                } finally {
+                    $zip->close();
+                }
+            }
+            $service = app(QueuedMissingFormImportService::class);
+            $import = $service->srv_queue(new ImportMissingFormsDTO($source, 'test.xlsx', 'xlsx', filesize($source)), $this->administrator);
+            $service->srv_process($import->missing_form_import_code_unique);
+
+            return $import->fresh();
+        } finally {
+            Storage::disk('local')->delete('security-test-input.xlsx');
+        }
+    }
+
+    private function assertRejectedImport(MissingFormImportModel $import, string $message): void
+    {
+        $this->assertSame(RegistryImportStatus::Failed, $import->status);
+        $this->assertStringContainsString($message, $import->errors[0]);
+        $this->assertSame(0, $import->imported_rows);
+        $this->assertDatabaseCount('reg_missing_form_models', 0);
+        Storage::disk('local')->assertMissing($import->file_path);
+        Storage::disk('local')->assertMissing($import->file_path.'.normalized.csv');
+        Event::assertNotDispatched(MissingFormsImported::class);
     }
 
     private function createUserForRole(RoleCode $roleCode): UserModel

@@ -30,5 +30,15 @@ return [
         'max_file_size_kb' => 20480,
         'max_rows' => 100000,
         'chunk_size' => 1000,
+        'xlsx' => [
+            'max_entries' => 1024,
+            'max_directory_bytes' => 1048576,
+            'max_uncompressed_bytes' => 268435456,
+            'max_part_bytes' => 134217728,
+            'max_sheets' => 64,
+            'max_columns' => 64,
+            'max_cell_bytes' => 4096,
+            'max_shared_strings' => 1000000,
+        ],
     ],
 ];

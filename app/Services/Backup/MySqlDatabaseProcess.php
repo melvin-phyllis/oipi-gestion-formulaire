@@ -12,7 +12,7 @@ final class MySqlDatabaseProcess implements DatabaseProcessInterface
     /** @var array<string, mixed> */
     private array $connection;
 
-    public function __construct()
+    public function __construct(private readonly BackupDumpCompatibilityService $compatibility)
     {
         $connectionName = (string) config('database.default');
         $this->connection = (array) config("database.connections.{$connectionName}", []);
@@ -79,7 +79,7 @@ final class MySqlDatabaseProcess implements DatabaseProcessInterface
                 '--default-character-set=utf8mb4',
                 $this->process_databaseName(),
             ]);
-            $process->setInput($input);
+            $process->setInput($this->compatibility->srv_restoreInput($input));
             $this->run($process);
         } finally {
             fclose($input);

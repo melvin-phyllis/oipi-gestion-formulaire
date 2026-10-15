@@ -86,15 +86,7 @@ final class RolePermissionSeeder extends Seeder
                 }
             }
 
-            $registryManager = $roles->get(RoleCode::RegistryManager->value);
-            $auditPermission = $permissions->get(PermissionCode::AuditView->value);
-
-            if ($registryManager instanceof RoleModel && $auditPermission instanceof PermissionModel) {
-                RolePermissionModel::query()
-                    ->where('role_code_unique', $registryManager->role_code_unique)
-                    ->where('permission_code_unique', $auditPermission->permission_code_unique)
-                    ->update(['is_active' => false]);
-            }
+            $this->call(AuditAccessPermissionSeeder::class);
         });
     }
 }

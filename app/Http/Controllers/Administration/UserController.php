@@ -19,6 +19,7 @@ use App\Services\Administration\UserManagementService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 final class UserController extends Controller
 {
@@ -36,11 +37,11 @@ final class UserController extends Controller
         );
     }
 
-    public function ctrl_create(): View
+    public function ctrl_create(Request $request): View
     {
         return view(
             'administration.users.create',
-            $this->userManagement->srv_formOptions(),
+            $this->userManagement->srv_formOptions($request->user()),
         );
     }
 
@@ -64,16 +65,16 @@ final class UserController extends Controller
         );
 
         return redirect()
-            ->route('users.edit', $result->user)
+            ->route('users.edit', $result->userUuid)
             ->with('success', 'Le compte utilisateur a été créé. Communiquez le mot de passe temporaire de manière sécurisée.')
             ->with('temporary_password', $result->temporaryPassword);
     }
 
-    public function ctrl_edit(UserModel $user): View
+    public function ctrl_edit(Request $request, UserModel $user): View
     {
         return view(
             'administration.users.edit',
-            $this->userManagement->srv_formOptions() + ['managedUser' => $user],
+            $this->userManagement->srv_editData($user, $request->user()),
         );
     }
 

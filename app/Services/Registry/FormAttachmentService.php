@@ -2,6 +2,7 @@
 
 namespace App\Services\Registry;
 
+use App\Dto\Registry\AttachmentDownloadDTO;
 use App\Dto\Registry\CreateFormAttachmentDTO;
 use App\Dto\Registry\UploadFormAttachmentDTO;
 use App\Enums\Administration\PermissionCode;
@@ -19,7 +20,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 final class FormAttachmentService
@@ -107,7 +107,7 @@ final class FormAttachmentService
         MissingFormModel $form,
         FormAttachmentModel $attachment,
         UserModel $actor,
-    ): StreamedResponse {
+    ): AttachmentDownloadDTO {
         $this->assertBelongsToForm($form, $attachment);
         $this->assertPrivateDisk($attachment->disk);
         if ($form->status === FormStatus::Archived
@@ -136,15 +136,11 @@ final class FormAttachmentService
 
         FormAttachmentDownloaded::dispatch($attachment->uuid, $form->uuid, $actor->uuid);
 
-        return $disk->download(
-            $attachment->file_path,
-            $attachment->download_name,
-            [
-                'Content-Type' => $attachment->mime_type,
-                'Cache-Control' => 'private, no-store, max-age=0',
-                'Pragma' => 'no-cache',
-                'X-Content-Type-Options' => 'nosniff',
-            ],
+        return new AttachmentDownloadDTO(
+            disk: $attachment->disk,
+            path: $attachment->file_path,
+            filename: $attachment->download_name,
+            mimeType: $attachment->mime_type,
         );
     }
 

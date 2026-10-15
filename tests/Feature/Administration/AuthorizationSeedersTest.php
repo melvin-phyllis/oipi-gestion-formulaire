@@ -20,8 +20,8 @@ final class AuthorizationSeedersTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $this->assertDatabaseCount('adm_role_models', 4);
-        $this->assertDatabaseCount('adm_permission_models', 26);
-        $this->assertDatabaseCount('adm_role_permission_models', 57);
+        $this->assertDatabaseCount('adm_permission_models', 27);
+        $this->assertDatabaseCount('adm_role_permission_models', 58);
 
         $this->assertSame(
             count(PermissionCode::cases()),
@@ -79,8 +79,8 @@ final class AuthorizationSeedersTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $this->assertDatabaseCount('adm_role_models', 4);
-        $this->assertDatabaseCount('adm_permission_models', 26);
-        $this->assertDatabaseCount('adm_role_permission_models', 57);
+        $this->assertDatabaseCount('adm_permission_models', 27);
+        $this->assertDatabaseCount('adm_role_permission_models', 58);
     }
 
     private function activePermissionCount(RoleCode $roleCode): int

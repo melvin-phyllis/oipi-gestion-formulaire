@@ -6,6 +6,8 @@ use App\Models\Administration\UserModel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Routing\UrlGenerator;
+use RuntimeException;
 
 final class ResetPasswordNotification extends Notification
 {
@@ -31,10 +33,7 @@ final class ResetPasswordNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         /** @var UserModel $notifiable */
-        $resetUrl = route('password.reset', [
-            'token' => $this->token,
-            'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
+        $resetUrl = $this->resetUrl($notifiable);
         $expiresInMinutes = (int) config('auth.passwords.users.expire');
         $actionText = 'Réinitialiser mon mot de passe';
 
@@ -63,5 +62,31 @@ final class ResetPasswordNotification extends Notification
         return [
             'user_code_unique' => $notifiable->user_code_unique,
         ];
+    }
+
+    private function resetUrl(UserModel $user): string
+    {
+        $baseUrl = (string) config('app.url');
+        $parts = parse_url($baseUrl);
+
+        if (! is_array($parts)
+            || ! in_array($parts['scheme'] ?? null, ['http', 'https'], true)
+            || empty($parts['host'])
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])) {
+            throw new RuntimeException('APP_URL doit contenir une URL HTTP ou HTTPS valide pour les liens de réinitialisation.');
+        }
+
+        $applicationUrls = app(UrlGenerator::class);
+        $urls = new UrlGenerator(app('router')->getRoutes(), $applicationUrls->getRequest());
+        $urls->useOrigin($baseUrl);
+        $urls->forceScheme($parts['scheme']);
+
+        return $urls->route('password.reset', [
+            'token' => $this->token,
+            'email' => $user->getEmailForPasswordReset(),
+        ]);
     }
 }

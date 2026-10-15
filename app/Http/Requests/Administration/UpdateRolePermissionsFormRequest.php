@@ -11,7 +11,7 @@ final class UpdateRolePermissionsFormRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can(PermissionCode::UsersManage->value) === true;
+        return $this->user()?->can(PermissionCode::RolesManage->value) === true;
     }
 
     /** @return array<string, mixed> */

@@ -39,19 +39,29 @@ final class AnalyticsController extends Controller
     public function ctrl_exportExcel(AnalyticsFiltersFormRequest $request): StreamedResponse
     {
         $filters = AnalyticsFiltersDTO::fromValidated($request->validated());
-        $response = $this->exports->srv_excel($filters);
+        $export = $this->exports->srv_excel($filters);
         $this->dispatchExported($request, 'xlsx');
 
-        return $response;
+        return response()->streamDownload($export->writer, $export->filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function ctrl_exportPdf(AnalyticsFiltersFormRequest $request): Response
     {
         $filters = AnalyticsFiltersDTO::fromValidated($request->validated());
-        $response = $this->exports->srv_pdf($filters);
+        $html = view('analytics.export-pdf', $this->exports->srv_pdfData($filters))->render();
+        $export = $this->exports->srv_pdf($html);
         $this->dispatchExported($request, 'pdf');
 
-        return $response;
+        return response($export->content, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$export->filename.'"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function dispatchExported(AnalyticsFiltersFormRequest $request, string $format): void

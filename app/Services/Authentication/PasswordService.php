@@ -2,12 +2,12 @@
 
 namespace App\Services\Authentication;
 
+use App\Contracts\Administration\UserAccountServiceInterface;
 use App\Dto\Authentication\ChangePasswordDTO;
 use App\Dto\Authentication\ForgotPasswordDTO;
 use App\Dto\Authentication\ResetPasswordDTO;
 use App\Events\Authentication\UserPasswordChanged;
 use App\Models\Administration\UserModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 final class PasswordService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $users,
+        private readonly UserAccountServiceInterface $users,
     ) {}
 
     /** @throws ValidationException */
@@ -29,13 +29,13 @@ final class PasswordService
             ]);
         }
 
-        $this->users->repo_completePasswordChange($user, $data->password);
+        $this->users->srv_completePasswordChange($user, $data->password);
         UserPasswordChanged::dispatch($user->uuid, 'self_change');
     }
 
     public function srv_sendResetLink(ForgotPasswordDTO $data): void
     {
-        $user = $this->users->repo_findActiveByEmail($data->email);
+        $user = $this->users->srv_findActiveByEmail($data->email);
 
         if (! $user instanceof UserModel) {
             return;
@@ -57,7 +57,7 @@ final class PasswordService
                 'is_active' => true,
             ],
             function (UserModel $user, string $password) use (&$userUuid): void {
-                $this->users->repo_completePasswordChange($user, $password);
+                $this->users->srv_completePasswordChange($user, $password);
                 $userUuid = $user->uuid;
             },
         );

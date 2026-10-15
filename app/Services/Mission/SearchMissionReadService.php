@@ -2,6 +2,8 @@
 
 namespace App\Services\Mission;
 
+use App\Contracts\Administration\UserDirectoryServiceInterface;
+use App\Contracts\Registry\RegistryReferenceReadServiceInterface;
 use App\Dto\Mission\MissionFiltersDTO;
 use App\Enums\Administration\PermissionCode;
 use App\Enums\Mission\MissionResult;
@@ -10,17 +12,15 @@ use App\Enums\Registry\FormPriority;
 use App\Enums\Registry\FormStatus;
 use App\Models\Administration\UserModel;
 use App\Models\Mission\SearchMissionModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use App\Repositories\Interfaces\Mission\SearchMissionRepositoryInterface;
-use App\Repositories\Interfaces\Registry\RegistryReferenceRepositoryInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 
 final class SearchMissionReadService
 {
     public function __construct(
         private readonly SearchMissionRepositoryInterface $missions,
-        private readonly UserRepositoryInterface $users,
-        private readonly RegistryReferenceRepositoryInterface $references,
+        private readonly UserDirectoryServiceInterface $users,
+        private readonly RegistryReferenceReadServiceInterface $references,
     ) {}
 
     /** @return array<string, mixed> */
@@ -30,8 +30,8 @@ final class SearchMissionReadService
 
         return [
             'missions' => $this->missions->repo_paginate($filters, $viewer, $canViewAll),
-            'responsibleUsers' => $canViewAll ? $this->users->repo_activeUsers() : collect([$viewer]),
-            'searchLocations' => $this->references->repo_activeSearchLocations(),
+            'responsibleUsers' => $canViewAll ? $this->users->srv_activeUsers() : collect([$viewer]),
+            'searchLocations' => $this->references->srv_activeSearchLocations(),
             'statuses' => MissionStatus::cases(),
             'priorities' => FormPriority::cases(),
             'results' => MissionResult::cases(),
@@ -52,8 +52,8 @@ final class SearchMissionReadService
         return [
             'mission' => $mission,
             'canAssign' => $viewer->can(PermissionCode::MissionsAssign->value),
-            'responsibleUsers' => $this->users->repo_activeUsers(),
-            'searchLocations' => $this->references->repo_activeSearchLocations(),
+            'responsibleUsers' => $this->users->srv_activeUsers(),
+            'searchLocations' => $this->references->srv_activeSearchLocations(),
             'priorities' => FormPriority::cases(),
             'canRecordResult' => $mission->status->isActive() && (
                 $viewer->can(PermissionCode::MissionsRecordAnyResult->value)

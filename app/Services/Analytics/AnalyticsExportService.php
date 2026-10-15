@@ -3,9 +3,10 @@
 namespace App\Services\Analytics;
 
 use App\Dto\Analytics\AnalyticsFiltersDTO;
+use App\Dto\Analytics\PdfExportDTO;
+use App\Dto\Analytics\SpreadsheetExportDTO;
 use Dompdf\Dompdf;
 use Dompdf\Options;
-use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -14,7 +15,6 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class AnalyticsExportService
 {
@@ -22,12 +22,13 @@ final class AnalyticsExportService
 
     public function __construct(private readonly AnalyticsService $analytics) {}
 
-    public function srv_excel(AnalyticsFiltersDTO $filters): StreamedResponse
+    public function srv_excel(AnalyticsFiltersDTO $filters): SpreadsheetExportDTO
     {
         $report = $this->analytics->srv_report($filters);
         $spreadsheet = $this->buildSpreadsheet($report, $filters);
 
-        return response()->streamDownload(
+        return new SpreadsheetExportDTO(
+            $this->filename('xlsx'),
             function () use ($spreadsheet): void {
                 try {
                     (new Xlsx($spreadsheet))->save('php://output');
@@ -35,38 +36,34 @@ final class AnalyticsExportService
                     $spreadsheet->disconnectWorksheets();
                 }
             },
-            $this->filename('xlsx'),
-            [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-                'X-Content-Type-Options' => 'nosniff',
-            ],
         );
     }
 
-    public function srv_pdf(AnalyticsFiltersDTO $filters): Response
+    /** @return array<string, mixed> */
+    public function srv_pdfData(AnalyticsFiltersDTO $filters): array
     {
         $report = $this->analytics->srv_report($filters);
+
+        return [
+            ...$report,
+            'appliedFilters' => $this->appliedFilters($report, $filters),
+            'generatedAt' => now(),
+        ];
+    }
+
+    public function srv_pdf(string $html): PdfExportDTO
+    {
         $options = new Options;
         $options->set('defaultFont', 'DejaVu Sans');
         $options->set('isRemoteEnabled', false);
         $options->set('isPhpEnabled', false);
 
         $pdf = new Dompdf($options);
-        $pdf->loadHtml(view('analytics.export-pdf', [
-            ...$report,
-            'appliedFilters' => $this->appliedFilters($report, $filters),
-            'generatedAt' => now(),
-        ])->render(), 'UTF-8');
+        $pdf->loadHtml($html, 'UTF-8');
         $pdf->setPaper('a4', 'landscape');
         $pdf->render();
 
-        return response($pdf->output(), Response::HTTP_OK, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$this->filename('pdf').'"',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return new PdfExportDTO($this->filename('pdf'), $pdf->output());
     }
 
     /** @param array<string, mixed> $report */

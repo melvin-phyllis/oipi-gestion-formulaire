@@ -17,7 +17,7 @@ Route::middleware([
         Route::get('/', [ProfileController::class, 'ctrl_edit'])
             ->name('edit');
         Route::patch('/', [ProfileController::class, 'ctrl_update'])
-            ->middleware('throttle:profile-updates')
+            ->middleware(['throttle:profile-updates', 'throttle:sensitive-actions'])
             ->name('update');
     });
 
@@ -49,7 +49,7 @@ Route::middleware([
             ->name('status.update');
         Route::post('/{user}/reset-password', [UserController::class, 'ctrl_resetPassword'])
             ->whereUuid('user')
-            ->middleware('throttle:password-reset')
+            ->middleware('throttle:sensitive-actions')
             ->name('password.reset');
     });
 
@@ -57,7 +57,7 @@ Route::middleware([
     'auth',
     'session.current',
     'password.changed',
-    'permission:users_manage',
+    'permission:roles_manage',
 ])
     ->prefix('roles')
     ->name('roles.')

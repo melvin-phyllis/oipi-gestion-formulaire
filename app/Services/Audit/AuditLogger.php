@@ -2,6 +2,7 @@
 
 namespace App\Services\Audit;
 
+use App\Contracts\Audit\AuditContextProviderInterface;
 use App\Dto\Audit\RecordAuditDTO;
 use App\Enums\Audit\AuditAction;
 use App\Models\Administration\UserModel;
@@ -10,7 +11,6 @@ use App\Repositories\Interfaces\Audit\AuditRepositoryInterface;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 final class AuditLogger
@@ -25,7 +25,10 @@ final class AuditLogger
         'cookie',
     ];
 
-    public function __construct(private readonly AuditRepositoryInterface $audit) {}
+    public function __construct(
+        private readonly AuditRepositoryInterface $audit,
+        private readonly AuditContextProviderInterface $context,
+    ) {}
 
     /** @param array<string, mixed> $metadata */
     public function srv_record(
@@ -41,7 +44,7 @@ final class AuditLogger
         $subject = $subjectType && $subjectUuid
             ? $this->audit->repo_resolveSubject($subjectType, $subjectUuid)
             : ['codeUnique' => null, 'label' => null];
-        $request = $this->currentRequest();
+        $context = $this->context->context();
 
         return $this->audit->repo_create(new RecordAuditDTO(
             action: $action,
@@ -52,25 +55,14 @@ final class AuditLogger
             subjectUuid: $subjectUuid,
             subjectCodeUnique: $subject['codeUnique'],
             subjectLabel: $subject['label'],
-            routeName: $request?->route()?->getName(),
-            httpMethod: $request?->method(),
-            requestPath: $request ? Str::limit('/'.$request->path(), 500, '') : null,
-            ipAddress: $request?->ip(),
-            userAgent: $request ? Str::limit((string) $request->userAgent(), 1000, '') : null,
+            routeName: $context->routeName,
+            httpMethod: $context->httpMethod,
+            requestPath: $context->requestPath,
+            ipAddress: $context->ipAddress,
+            userAgent: $context->userAgent,
             metadata: $this->sanitizeMetadata($metadata),
             occurredAt: CarbonImmutable::now(),
         ));
-    }
-
-    private function currentRequest(): ?Request
-    {
-        if (! app()->bound('request')) {
-            return null;
-        }
-
-        $request = app('request');
-
-        return $request instanceof Request ? $request : null;
     }
 
     /**

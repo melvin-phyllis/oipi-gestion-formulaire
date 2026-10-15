@@ -2,6 +2,9 @@
 
 namespace App\Services\Analytics;
 
+use App\Contracts\Administration\UserDirectoryServiceInterface;
+use App\Contracts\Audit\AuditActivityReadServiceInterface;
+use App\Contracts\Registry\RegistryReferenceReadServiceInterface;
 use App\Dto\Analytics\AnalyticsFiltersDTO;
 use App\Enums\Administration\PermissionCode;
 use App\Enums\Administration\RoleCode;
@@ -13,10 +16,7 @@ use App\Models\Administration\UserModel;
 use App\Models\Audit\AuditLogModel;
 use App\Models\Mission\SearchMissionModel;
 use App\Models\Registry\MissingFormModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use App\Repositories\Interfaces\Analytics\AnalyticsRepositoryInterface;
-use App\Repositories\Interfaces\Audit\AuditRepositoryInterface;
-use App\Repositories\Interfaces\Registry\RegistryReferenceRepositoryInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -24,9 +24,9 @@ final class AnalyticsService
 {
     public function __construct(
         private readonly AnalyticsRepositoryInterface $analytics,
-        private readonly RegistryReferenceRepositoryInterface $references,
-        private readonly UserRepositoryInterface $users,
-        private readonly AuditRepositoryInterface $audit,
+        private readonly RegistryReferenceReadServiceInterface $references,
+        private readonly UserDirectoryServiceInterface $users,
+        private readonly AuditActivityReadServiceInterface $audit,
     ) {}
 
     /** @return array<string, mixed> */
@@ -75,9 +75,9 @@ final class AnalyticsService
                 ])
                 ->values(),
             'monthlyTrend' => $this->monthlyTrend($filters),
-            'titleTypes' => $this->references->repo_titleTypes(),
-            'searchLocations' => $this->references->repo_searchLocations(),
-            'responsibleUsers' => $this->users->repo_activeUsers(),
+            'titleTypes' => $this->references->srv_titleTypes(),
+            'searchLocations' => $this->references->srv_searchLocations(),
+            'responsibleUsers' => $this->users->srv_activeUsers(),
             'statuses' => FormStatus::cases(),
             'priorities' => FormPriority::cases(),
             'trendPeriods' => [6, 12, 24],
@@ -93,7 +93,7 @@ final class AnalyticsService
         $missionCounts = $this->analytics->repo_missionCounts($filters);
         $kpis = $this->kpis($statusCounts, $missionCounts);
 
-        $viewer->loadMissing('role');
+        $viewer = $this->users->srv_loadRole($viewer);
         $role = RoleCode::tryFrom((string) $viewer->role?->role_code);
         $isPersonalScope = $role === RoleCode::SearchAgent;
         $canAssign = $viewer->can(PermissionCode::MissionsAssign->value);
@@ -148,7 +148,7 @@ final class AnalyticsService
                 ? $this->formItems($this->analytics->repo_priorityForms($responsible))
                 : collect(),
             'recentActivity' => $canViewActivity
-                ? $this->audit->repo_recentOperationalActivities()->map(
+                ? $this->audit->srv_recentOperationalActivities()->map(
                     fn (AuditLogModel $activity): array => $this->activityItem($activity),
                 )->values()
                 : collect(),

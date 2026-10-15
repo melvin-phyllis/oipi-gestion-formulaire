@@ -2,12 +2,14 @@
 
 namespace App\Services\Administration;
 
+use App\Contracts\Organization\OrganizationDirectoryServiceInterface;
 use App\Dto\Administration\CreateUserDTO;
 use App\Dto\Administration\CreateUserResultDTO;
 use App\Dto\Administration\ResetUserPasswordDTO;
 use App\Dto\Administration\UpdateUserDTO;
 use App\Dto\Administration\UpdateUserStatusDTO;
 use App\Dto\Administration\UserFiltersDTO;
+use App\Enums\Administration\PermissionCode;
 use App\Enums\Administration\RoleCode;
 use App\Events\Administration\UserCreated;
 use App\Events\Administration\UserPasswordReset;
@@ -17,7 +19,7 @@ use App\Models\Administration\RoleModel;
 use App\Models\Administration\UserModel;
 use App\Models\Organization\ServiceModel;
 use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
-use App\Repositories\Interfaces\Organization\OrganizationDirectoryRepositoryInterface;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +31,7 @@ final class UserManagementService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
-        private readonly OrganizationDirectoryRepositoryInterface $organization,
+        private readonly OrganizationDirectoryServiceInterface $organization,
     ) {}
 
     /**
@@ -44,7 +46,7 @@ final class UserManagementService
         return [
             'users' => $this->users->repo_paginate($filters),
             'roles' => $this->users->repo_activeRoles(),
-            'services' => $this->organization->repo_activeServices(),
+            'services' => $this->organization->srv_activeServices(),
         ];
     }
 
@@ -54,19 +56,30 @@ final class UserManagementService
      *     services: Collection<int, ServiceModel>
      * }
      */
-    public function srv_formOptions(): array
+    public function srv_formOptions(UserModel $actor): array
     {
+        $roles = $this->users->repo_activeRoles();
+        if (! $this->users->repo_isActiveSystemAdministrator($actor)) {
+            $roles = $roles->reject(fn (RoleModel $role): bool => $role->role_code === RoleCode::SystemAdmin->value);
+        }
+
         return [
-            'roles' => $this->users->repo_activeRoles(),
-            'services' => $this->organization->repo_activeServices(),
+            'roles' => $roles,
+            'services' => $this->organization->srv_activeServices(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function srv_editData(UserModel $user, UserModel $actor): array
+    {
+        $this->assertCanManageAccount($actor, $user);
+
+        return $this->srv_formOptions($actor) + ['managedUser' => $user];
     }
 
     /** @throws ValidationException */
     public function srv_create(CreateUserDTO $data, UserModel $actor): CreateUserResultDTO
     {
-        $this->assertActiveReferences($data->roleCodeUnique, $data->serviceCodeUnique);
-
         $resolvedData = $data->username === null
             ? $data->withUsername($this->srv_generateUsername($data->firstNames, $data->lastName))
             : $data;
@@ -78,17 +91,17 @@ final class UserManagementService
             spaces: false,
         );
 
-        $user = DB::transaction(
-            fn (): UserModel => $this->users->repo_create(
-                $resolvedData,
-                $actor,
-                $temporaryPassword,
-            ),
-        );
+        $user = DB::transaction(function () use ($resolvedData, $actor, $temporaryPassword): UserModel {
+            [$lockedActor] = $this->lockManagementUsers($actor);
+            [$role] = $this->assertActiveReferences($resolvedData->roleCodeUnique, $resolvedData->serviceCodeUnique);
+            $this->assertCanManageAccount($lockedActor, assignedRole: $role);
+
+            return $this->users->repo_create($resolvedData, $lockedActor, $temporaryPassword);
+        }, 3);
 
         UserCreated::dispatch($user->uuid, $actor->uuid);
 
-        return new CreateUserResultDTO($user, $temporaryPassword);
+        return new CreateUserResultDTO($user->uuid, $temporaryPassword);
     }
 
     public function srv_generateUsername(string $firstNames, string $lastName): string
@@ -127,24 +140,21 @@ final class UserManagementService
         UpdateUserDTO $data,
         UserModel $actor,
     ): UserModel {
-        [$role] = $this->assertActiveReferences(
-            $data->roleCodeUnique,
-            $data->serviceCodeUnique,
-        );
+        $updatedUser = DB::transaction(function () use ($user, $data, $actor): UserModel {
+            [$lockedActor, $lockedUser] = $this->lockManagementUsers($actor, $user);
+            [$role] = $this->assertActiveReferences($data->roleCodeUnique, $data->serviceCodeUnique);
+            $this->assertCanManageAccount($lockedActor, $lockedUser, $role);
 
-        if (
-            $role->role_code !== RoleCode::SystemAdmin->value
-            && $this->users->repo_isActiveSystemAdministrator($user)
-            && $this->users->repo_countActiveSystemAdministrators() <= 1
-        ) {
-            throw ValidationException::withMessages([
-                'role_code_unique' => 'Le dernier administrateur système actif doit conserver son rôle.',
-            ]);
-        }
+            if ($role->role_code !== RoleCode::SystemAdmin->value
+                && $this->users->repo_isActiveSystemAdministrator($lockedUser)
+                && $this->users->repo_countActiveSystemAdministrators() <= 1) {
+                throw ValidationException::withMessages([
+                    'role_code_unique' => 'Le dernier administrateur système actif doit conserver son rôle.',
+                ]);
+            }
 
-        $updatedUser = DB::transaction(
-            fn (): UserModel => $this->users->repo_update($user, $data),
-        );
+            return $this->users->repo_update($lockedUser, $data);
+        }, 3);
 
         UserUpdated::dispatch($updatedUser->uuid, $actor->uuid);
 
@@ -157,29 +167,34 @@ final class UserManagementService
         UpdateUserStatusDTO $data,
         UserModel $actor,
     ): UserModel {
-        if ($user->is_active === $data->isActive) {
-            return $user;
-        }
+        [$updatedUser, $changed] = DB::transaction(function () use ($user, $data, $actor): array {
+            [$lockedActor, $lockedUser] = $this->lockManagementUsers($actor, $user);
+            $this->assertCanManageAccount($lockedActor, $lockedUser);
 
-        if ($user->is($actor) && ! $data->isActive) {
-            throw ValidationException::withMessages([
-                'is_active' => 'Vous ne pouvez pas désactiver votre propre compte.',
-            ]);
-        }
+            if ($lockedUser->is_active === $data->isActive) {
+                return [$lockedUser, false];
+            }
 
-        if (
-            ! $data->isActive
-            && $this->users->repo_isActiveSystemAdministrator($user)
-            && $this->users->repo_countActiveSystemAdministrators() <= 1
-        ) {
-            throw ValidationException::withMessages([
-                'is_active' => 'Le dernier administrateur système actif ne peut pas être désactivé.',
-            ]);
-        }
+            if ($lockedUser->is($lockedActor) && ! $data->isActive) {
+                throw ValidationException::withMessages([
+                    'is_active' => 'Vous ne pouvez pas désactiver votre propre compte.',
+                ]);
+            }
 
-        $updatedUser = DB::transaction(
-            fn (): UserModel => $this->users->repo_setActive($user, $data->isActive),
-        );
+            if (! $data->isActive
+                && $this->users->repo_isActiveSystemAdministrator($lockedUser)
+                && $this->users->repo_countActiveSystemAdministrators() <= 1) {
+                throw ValidationException::withMessages([
+                    'is_active' => 'Le dernier administrateur système actif ne peut pas être désactivé.',
+                ]);
+            }
+
+            return [$this->users->repo_setActive($lockedUser, $data->isActive), true];
+        }, 3);
+
+        if (! $changed) {
+            return $updatedUser;
+        }
 
         UserStatusChanged::dispatch(
             $updatedUser->uuid,
@@ -196,12 +211,6 @@ final class UserManagementService
         ResetUserPasswordDTO $data,
         UserModel $actor,
     ): string {
-        if (! Hash::check($data->currentPassword, $actor->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => 'Votre mot de passe actuel est incorrect.',
-            ]);
-        }
-
         $temporaryPassword = Str::password(
             length: 20,
             letters: true,
@@ -210,13 +219,57 @@ final class UserManagementService
             spaces: false,
         );
 
-        $updatedUser = DB::transaction(
-            fn (): UserModel => $this->users->repo_resetPassword($user, $temporaryPassword),
-        );
+        $updatedUser = DB::transaction(function () use ($user, $data, $actor, $temporaryPassword): UserModel {
+            [$lockedActor, $lockedUser] = $this->lockManagementUsers($actor, $user);
+            $this->assertCanManageAccount($lockedActor, $lockedUser);
+            if (! Hash::check($data->currentPassword, $lockedActor->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => 'Votre mot de passe actuel est incorrect.',
+                ]);
+            }
+
+            return $this->users->repo_resetPassword($lockedUser, $temporaryPassword);
+        }, 3);
 
         UserPasswordReset::dispatch($updatedUser->uuid, $actor->uuid);
 
         return $temporaryPassword;
+    }
+
+    private function assertCanManageAccount(
+        UserModel $actor,
+        ?UserModel $target = null,
+        ?RoleModel $assignedRole = null,
+    ): void {
+        if (! $actor->can(PermissionCode::UsersManage->value)) {
+            throw new AuthorizationException('Vous ne pouvez pas gérer les comptes utilisateurs.');
+        }
+
+        $protectedTarget = $target !== null && $this->users->repo_hasSystemAdministratorRole($target);
+        $assignsAdministrator = $assignedRole?->role_code === RoleCode::SystemAdmin->value;
+        if (($protectedTarget || $assignsAdministrator)
+            && ! $this->users->repo_isActiveSystemAdministrator($actor)) {
+            throw new AuthorizationException('Seul un administrateur système peut créer ou modifier un compte administrateur.');
+        }
+    }
+
+    /** @return array{UserModel, UserModel|null} */
+    private function lockManagementUsers(UserModel $actor, ?UserModel $target = null): array
+    {
+        $this->users->repo_lockActiveSystemAdministrators();
+        $codes = [$actor->user_code_unique];
+        if ($target !== null) {
+            $codes[] = $target->user_code_unique;
+        }
+        $lockedUsers = $this->users->repo_lockForManagement(array_values(array_unique($codes)));
+        $lockedActor = $lockedUsers->get($actor->user_code_unique);
+        $lockedTarget = $target !== null ? $lockedUsers->get($target->user_code_unique) : null;
+
+        if (! $lockedActor instanceof UserModel || ($target !== null && ! $lockedTarget instanceof UserModel)) {
+            throw new AuthorizationException('Le compte utilisateur est indisponible.');
+        }
+
+        return [$lockedActor, $lockedTarget];
     }
 
     /**
@@ -236,7 +289,7 @@ final class UserManagementService
             ]);
         }
 
-        $service = $this->organization->repo_findActiveService($serviceCodeUnique);
+        $service = $this->organization->srv_findActiveService($serviceCodeUnique);
 
         if (! $service instanceof ServiceModel) {
             throw ValidationException::withMessages([

@@ -10,6 +10,7 @@ use App\Models\Registry\FormAttachmentModel;
 use App\Models\Registry\MissingFormModel;
 use App\Services\Registry\FormAttachmentService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FormAttachmentController extends Controller
@@ -30,7 +31,14 @@ final class FormAttachmentController extends Controller
         MissingFormModel $missingForm,
         FormAttachmentModel $attachment,
     ): StreamedResponse {
-        return $this->attachments->srv_download($missingForm, $attachment, $request->user());
+        $file = $this->attachments->srv_download($missingForm, $attachment, $request->user());
+
+        return Storage::disk($file->disk)->download($file->path, $file->filename, [
+            'Content-Type' => $file->mimeType,
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function ctrl_destroy(

@@ -169,7 +169,7 @@ final class DatabaseBackupBackendTest extends TestCase
         $this->assertSame(1, $this->maintenance->upCount);
         $this->assertSame(2, $this->databaseProcess->dumpCount);
         $this->assertSame(1, $this->databaseProcess->restoreCount);
-        $this->assertDatabaseCount('sys_database_backup_models', 2);
+        $this->assertDatabaseCount('bkp_backup_models', 2);
         $this->assertDatabaseHas('aud_audit_log_models', [
             'action_code' => AuditAction::BackupRestored->value,
             'actor_user_code_unique' => $administrator->user_code_unique,
@@ -215,11 +215,11 @@ final class DatabaseBackupBackendTest extends TestCase
             ->update(['created_at' => $oldDate, 'updated_at' => $oldDate]);
 
         $this->assertSame(1, $service->srv_prune());
-        $this->assertDatabaseHas('sys_database_backup_models', [
+        $this->assertDatabaseHas('bkp_backup_models', [
             'id' => $manual->getKey(),
             'deleted_at' => null,
         ]);
-        $this->assertSoftDeleted('sys_database_backup_models', [
+        $this->assertSoftDeleted('bkp_backup_models', [
             'id' => $automatic->getKey(),
         ]);
         Storage::disk('local')->assertExists($manual->file_path);
@@ -232,7 +232,7 @@ final class DatabaseBackupBackendTest extends TestCase
             ->expectsOutputToContain('Sauvegarde créée')
             ->assertSuccessful();
 
-        $this->assertDatabaseHas('sys_database_backup_models', [
+        $this->assertDatabaseHas('bkp_backup_models', [
             'backup_type' => BackupType::Scheduled->value,
         ]);
     }

@@ -25,6 +25,7 @@ enum PermissionCode: string
     case AnalyticsView = 'analytics_view';
     case RegistrySearch = 'registry_search';
     case UsersManage = 'users_manage';
+    case RolesManage = 'roles_manage';
     case AuditView = 'audit_view';
     case SettingsManage = 'settings_manage';
     case BackupsManage = 'backups_manage';

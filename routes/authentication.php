@@ -27,6 +27,7 @@ Route::middleware(['auth', 'session.current'])->group(function (): void {
     Route::get('/change-password', [PasswordController::class, 'ctrl_showChange'])
         ->name('password.change');
     Route::post('/change-password', [PasswordController::class, 'ctrl_change'])
+        ->middleware('throttle:sensitive-actions')
         ->name('password.change.update');
 });
 

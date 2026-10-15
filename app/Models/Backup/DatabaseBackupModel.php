@@ -27,7 +27,7 @@ final class DatabaseBackupModel extends Model
 {
     use HasUniqueCode, HasUuid, SoftDeletes;
 
-    protected $table = 'sys_database_backup_models';
+    protected $table = 'bkp_backup_models';
 
     public function creator(): BelongsTo
     {

@@ -23,5 +23,6 @@ Route::middleware([
             ->name('destroy');
         Route::post('/{backup}/restore', [BackupController::class, 'ctrl_restore'])
             ->whereUuid('backup')
+            ->middleware('throttle:sensitive-actions')
             ->name('restore');
     });

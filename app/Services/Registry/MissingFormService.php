@@ -2,6 +2,7 @@
 
 namespace App\Services\Registry;
 
+use App\Contracts\Administration\UserDirectoryServiceInterface;
 use App\Dto\Registry\ArchiveMissingFormDTO;
 use App\Dto\Registry\CreateMissingFormDTO;
 use App\Dto\Registry\MissingFormFiltersDTO;
@@ -16,7 +17,6 @@ use App\Models\Administration\UserModel;
 use App\Models\Registry\MissingFormModel;
 use App\Models\Registry\SearchLocationModel;
 use App\Models\Registry\TitleTypeModel;
-use App\Repositories\Interfaces\Administration\UserRepositoryInterface;
 use App\Repositories\Interfaces\Registry\MissingFormRepositoryInterface;
 use App\Repositories\Interfaces\Registry\RegistryReferenceRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -30,7 +30,7 @@ final class MissingFormService
     public function __construct(
         private readonly MissingFormRepositoryInterface $forms,
         private readonly RegistryReferenceRepositoryInterface $references,
-        private readonly UserRepositoryInterface $users,
+        private readonly UserDirectoryServiceInterface $users,
     ) {}
 
     /**
@@ -65,7 +65,7 @@ final class MissingFormService
             'titleTypes' => $this->references->repo_availableTitleTypes(),
             'priorities' => FormPriority::cases(),
             'searchLocations' => $this->references->repo_activeSearchLocations(),
-            'finderUsers' => $this->users->repo_activeUsers(),
+            'finderUsers' => $this->users->srv_activeUsers(),
         ];
     }
 
@@ -85,7 +85,7 @@ final class MissingFormService
         return [
             'missingForm' => $form,
             'searchLocations' => $this->references->repo_activeSearchLocations(),
-            'responsibleUsers' => $this->users->repo_activeUsers(),
+            'responsibleUsers' => $this->users->srv_activeUsers(),
             'priorities' => FormPriority::cases(),
             'hasActiveMissions' => $form->missions->contains(
                 fn ($mission): bool => $mission->status->isActive(),

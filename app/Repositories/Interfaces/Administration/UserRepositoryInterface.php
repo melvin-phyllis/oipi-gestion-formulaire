@@ -42,6 +42,17 @@ interface UserRepositoryInterface
 
     public function repo_isActiveSystemAdministrator(UserModel $user): bool;
 
+    public function repo_hasSystemAdministratorRole(UserModel $user): bool;
+
+    /**
+     * @param  list<string>  $userCodes
+     * @return Collection<string, UserModel>
+     */
+    public function repo_lockForManagement(array $userCodes): Collection;
+
+    /** @return Collection<int, UserModel> */
+    public function repo_lockActiveSystemAdministrators(): Collection;
+
     public function repo_countActiveSystemAdministrators(): int;
 
     public function repo_findForAuthentication(string $login): ?UserModel;
@@ -49,6 +60,10 @@ interface UserRepositoryInterface
     public function repo_findActiveByEmail(string $email): ?UserModel;
 
     public function repo_findByCodeUnique(string $codeUnique): UserModel;
+
+    public function repo_loadForProfile(UserModel $user): UserModel;
+
+    public function repo_loadRole(UserModel $user): UserModel;
 
     public function repo_updatePasswordHash(UserModel $user, string $passwordHash): void;
 

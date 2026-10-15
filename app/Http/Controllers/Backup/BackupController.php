@@ -13,6 +13,7 @@ use App\Models\Backup\DatabaseBackupModel;
 use App\Services\Backup\DatabaseBackupService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class BackupController extends Controller
@@ -57,7 +58,13 @@ final class BackupController extends Controller
         ManageDatabaseBackupFormRequest $request,
         DatabaseBackupModel $backup,
     ): StreamedResponse {
-        return $this->backups->srv_download($backup, $this->actor($request->user()));
+        $file = $this->backups->srv_download($backup, $this->actor($request->user()));
+
+        return Storage::disk($file->disk)->download($file->path, $file->filename, [
+            'Content-Type' => 'application/gzip',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function ctrl_destroy(
