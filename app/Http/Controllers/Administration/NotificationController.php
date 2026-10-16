@@ -36,8 +36,7 @@ final class NotificationController extends Controller
 
     public function ctrl_markRead(
         ManageNotificationFormRequest $request,
-        string $notification,
-    ): RedirectResponse {
+        string $notification,): RedirectResponse {
         $this->notifications->srv_markRead($notification, $request->user());
 
         return back()->with('success', 'La notification a été marquée comme lue.');

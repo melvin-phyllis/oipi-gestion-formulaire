@@ -1,0 +1,62 @@
+name: Tests RISFM
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risfm-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Laravel, Vite et sécurité navigateur
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      - name: Configurer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, dom, gd, zip, xmlreader, xmlwriter, fileinfo
+          coverage: none
+          tools: composer:v2
+
+      - name: Configurer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dépendances PHP
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Installer les dépendances JavaScript
+        run: npm ci
+
+      - name: Préparer Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Compiler les assets Vite
+        run: npm run build
+
+      - name: Exécuter les tests Laravel
+        run: php artisan test --compact
+
+      - name: Exécuter les tests de sécurité navigateur
+        run: npm run test:security
+        env:
+          BROWSER_BIN: google-chrome
