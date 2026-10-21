@@ -7,28 +7,28 @@ use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Registry\FormReopeningModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'missing_form_code_unique',
-    'previous_tracking_cycle',
-    'new_tracking_cycle',
-    'previous_status',
-    'reason',
-    'reopened_by_user_code_unique',
-    'reopened_by_name',
-    'reopened_at',
-])]
 final class FormReopeningModel extends Model
 {
     /** @use HasFactory<FormReopeningModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'reg_form_reopening_models';
+
+    protected $fillable = [
+        'missing_form_code_unique',
+        'previous_tracking_cycle',
+        'new_tracking_cycle',
+        'previous_status',
+        'reason',
+        'reopened_by_user_code_unique',
+        'reopened_by_name',
+        'reopened_at',
+    ];
 
     public function missingForm(): BelongsTo
     {

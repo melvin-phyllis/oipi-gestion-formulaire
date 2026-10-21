@@ -7,30 +7,30 @@ use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Mission\MissionReminderModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'search_mission_code_unique',
-    'recipient_user_code_unique',
-    'type',
-    'reminder_date',
-    'days_delta',
-    'notification_id',
-    'database_sent_at',
-    'email_attempted_at',
-    'email_sent_at',
-    'email_error',
-])]
 final class MissionReminderModel extends Model
 {
     /** @use HasFactory<MissionReminderModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'mis_mission_reminder_models';
+
+    protected $fillable = [
+        'search_mission_code_unique',
+        'recipient_user_code_unique',
+        'type',
+        'reminder_date',
+        'days_delta',
+        'notification_id',
+        'database_sent_at',
+        'email_attempted_at',
+        'email_sent_at',
+        'email_error',
+    ];
 
     public function mission(): BelongsTo
     {

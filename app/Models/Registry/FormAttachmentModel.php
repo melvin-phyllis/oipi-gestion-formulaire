@@ -6,34 +6,34 @@ use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Registry\FormAttachmentModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'uuid',
-    'missing_form_code_unique',
-    'disk',
-    'file_path',
-    'stored_name',
-    'original_name',
-    'download_name',
-    'mime_type',
-    'extension',
-    'size_bytes',
-    'sha256',
-    'uploaded_by_user_code_unique',
-    'uploader_name',
-    'deleted_by_user_code_unique',
-])]
 final class FormAttachmentModel extends Model
 {
     /** @use HasFactory<FormAttachmentModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'reg_form_attachment_models';
+
+    protected $fillable = [
+        'uuid',
+        'missing_form_code_unique',
+        'disk',
+        'file_path',
+        'stored_name',
+        'original_name',
+        'download_name',
+        'mime_type',
+        'extension',
+        'size_bytes',
+        'sha256',
+        'uploaded_by_user_code_unique',
+        'uploader_name',
+        'deleted_by_user_code_unique',
+    ];
 
     public function missingForm(): BelongsTo
     {

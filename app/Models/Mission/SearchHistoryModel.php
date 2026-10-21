@@ -9,31 +9,31 @@ use App\Models\Registry\MissingFormModel;
 use App\Models\Registry\SearchLocationModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable([
-    'search_mission_code_unique',
-    'missing_form_code_unique',
-    'tracking_cycle',
-    'search_location_code_unique',
-    'search_location_name',
-    'responsible_user_code_unique',
-    'responsible_name',
-    'form_status',
-    'mission_result',
-    'searched_on',
-    'result_summary',
-    'recorded_by_user_code_unique',
-    'recorded_by_name',
-    'source',
-])]
 final class SearchHistoryModel extends Model
 {
     use HasUniqueCode, HasUuid;
 
     protected $table = 'mis_search_history_models';
+
+    protected $fillable = [
+        'search_mission_code_unique',
+        'missing_form_code_unique',
+        'tracking_cycle',
+        'search_location_code_unique',
+        'search_location_name',
+        'responsible_user_code_unique',
+        'responsible_name',
+        'form_status',
+        'mission_result',
+        'searched_on',
+        'result_summary',
+        'recorded_by_user_code_unique',
+        'recorded_by_name',
+        'source',
+    ];
 
     public function mission(): BelongsTo
     {

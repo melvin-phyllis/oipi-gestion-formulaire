@@ -36,6 +36,8 @@ final class MissionAssignmentNotificationTest extends TestCase
     {
         parent::setUp();
 
+        CarbonImmutable::setTestNow('2026-10-15 08:00:00');
+
         $this->service = app(SearchMissionService::class);
         $this->assigner = UserModel::factory()->create([
             'last_name' => 'KOUASSI',
@@ -52,6 +54,13 @@ final class MissionAssignmentNotificationTest extends TestCase
         $this->location = SearchLocationModel::factory()->create([
             'location_name' => 'Archives centrales',
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_assignment_queues_database_and_mail_notification_for_responsible(): void

@@ -8,8 +8,6 @@ use App\Notifications\Authentication\ResetPasswordNotification;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Administration\UserModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,32 +16,34 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable([
-    'role_code_unique',
-    'service_code_unique',
-    'username',
-    'last_name',
-    'first_names',
-    'email',
-    'phone',
-    'profile_photo_path',
-    'password',
-    'is_active',
-    'must_change_password',
-    'session_version',
-    'last_login_at',
-    'created_by_code_unique',
-])]
-#[Hidden([
-    'password',
-    'remember_token',
-])]
 final class UserModel extends Authenticatable
 {
     /** @use HasFactory<UserModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, Notifiable, SoftDeletes;
 
     protected $table = 'adm_user_models';
+
+    protected $fillable = [
+        'role_code_unique',
+        'service_code_unique',
+        'username',
+        'last_name',
+        'first_names',
+        'email',
+        'phone',
+        'profile_photo_path',
+        'password',
+        'is_active',
+        'must_change_password',
+        'session_version',
+        'last_login_at',
+        'created_by_code_unique',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     public function role(): BelongsTo
     {

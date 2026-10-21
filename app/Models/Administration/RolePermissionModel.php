@@ -5,23 +5,23 @@ namespace App\Models\Administration;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Administration\RolePermissionModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'role_code_unique',
-    'permission_code_unique',
-    'is_active',
-])]
 final class RolePermissionModel extends Model
 {
     /** @use HasFactory<RolePermissionModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'adm_role_permission_models';
+
+    protected $fillable = [
+        'role_code_unique',
+        'permission_code_unique',
+        'is_active',
+    ];
 
     public function role(): BelongsTo
     {

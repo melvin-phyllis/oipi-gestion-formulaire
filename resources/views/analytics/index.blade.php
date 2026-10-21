@@ -8,7 +8,7 @@
             <div class="col">
                 <h1 class="page-title d-flex align-items-center gap-2">
                     <i class="ti ti-chart-bar text-primary" aria-hidden="true"></i>
-                    Statistiques & Pilotage du registre
+                    Statistiques &amp; Pilotage du registre
                 </h1>
                 <div class="text-secondary mt-1">
                     Analyse des performances de recherche, du taux de résolution et de l'avancement des dossiers manquants.

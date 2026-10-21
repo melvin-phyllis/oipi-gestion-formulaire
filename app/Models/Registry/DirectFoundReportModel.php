@@ -7,32 +7,32 @@ use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Registry\DirectFoundReportModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
-#[Fillable([
-    'missing_form_code_unique',
-    'tracking_cycle',
-    'finder_type',
-    'finder_user_code_unique',
-    'finder_name',
-    'finder_organization',
-    'finder_contact',
-    'found_location_code_unique',
-    'found_on',
-    'result_summary',
-    'recorded_by_user_code_unique',
-    'recorded_by_name',
-])]
 final class DirectFoundReportModel extends Model
 {
     /** @use HasFactory<DirectFoundReportModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid;
 
     protected $table = 'reg_direct_found_report_models';
+
+    protected $fillable = [
+        'missing_form_code_unique',
+        'tracking_cycle',
+        'finder_type',
+        'finder_user_code_unique',
+        'finder_name',
+        'finder_organization',
+        'finder_contact',
+        'found_location_code_unique',
+        'found_on',
+        'result_summary',
+        'recorded_by_user_code_unique',
+        'recorded_by_name',
+    ];
 
     public function missingForm(): BelongsTo
     {
