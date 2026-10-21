@@ -4,7 +4,7 @@ Remplacez `<COMPTE>`, `<CHEMIN_PHP>` et les valeurs du modèle par celles de vot
 
 ## 1. Préparer cPanel
 
-- Activer PHP 8.3 ou supérieur et les extensions requises par Composer.
+- Activer PHP 8.2 ou supérieur et les extensions requises par Composer.
 - Créer une base MySQL et un utilisateur, puis lui donner les droits sur cette base.
 - Activer HTTPS et préparer les identifiants SMTP et Pusher Channels.
 - Placer le projet dans `/home/<COMPTE>/apps/oipi-suivi-pi`.

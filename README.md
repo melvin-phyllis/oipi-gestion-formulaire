@@ -2,7 +2,7 @@
 
 Nouvelle application web de l’Office Ivoirien de la Propriété Intellectuelle (OIPI), destinée au suivi centralisé des formulaires d’enregistrement des titres de propriété intellectuelle non retrouvés, manquants ou en cours de recherche.
 
-Guide de mise en production : [Déploiement sur cPanel](DEPLOIEMENT_CPANEL.md).
+Guide principal de mise en production : [Déploiement sur un serveur Debian](DEPLOIEMENT_DEBIAN.md). Le [guide cPanel](DEPLOIEMENT_CPANEL.md) reste disponible pour un hébergement mutualisé.
 
 Ce dépôt contient la version Laravel de RISFM. Il repart du besoin métier et ne reprend pas automatiquement l’architecture ou les choix techniques d’une application antérieure.
 
@@ -12,8 +12,8 @@ L’application est un projet Laravel monolithique : le backend, les pages Blade
 
 | Technologie | Utilisation dans le projet |
 | --- | --- |
-| PHP 8.3 | Langage exécuté sur le serveur. |
-| Laravel 13 | Routage, authentification, validation, autorisations, services, événements, tâches planifiées et files d’attente. |
+| PHP 8.2 | Langage exécuté sur le serveur. |
+| Laravel 12 | Routage, authentification, validation, autorisations, services, événements, tâches planifiées et files d’attente. |
 | Blade | Génération des pages HTML côté serveur. |
 | Tabler | Composants et présentation de l’interface d’administration. |
 | JavaScript et Laravel Echo | Interactions dans les pages et réception des notifications en temps réel. |
@@ -21,7 +21,7 @@ L’application est un projet Laravel monolithique : le backend, les pages Blade
 | MySQL ou MariaDB | Stockage des utilisateurs, formulaires, missions, notifications, audits, sessions, cache et tâches en attente. |
 | Pusher Channels | Diffusion en temps réel du compteur de notifications et de la progression des imports. |
 | Laravel Queue | Exécution en arrière-plan des imports volumineux et des notifications. Le projet utilise la file d’attente en base de données. |
-| Laravel Scheduler | Déclenchement des relances de missions et des sauvegardes automatiques depuis une tâche cron cPanel. |
+| Laravel Scheduler | Déclenchement des relances de missions et des sauvegardes automatiques depuis une tâche cron. |
 | PhpSpreadsheet | Lecture des imports XLSX et génération des exports Excel. |
 | Dompdf | Génération des rapports PDF. |
 | Stockage privé Laravel | Conservation des pièces jointes, fichiers d’import et sauvegardes hors du dossier public. |
@@ -269,7 +269,7 @@ Le projet est actuellement au stade de **stabilisation avant recette métier et 
 - tâches planifiées pour les relances de missions et les sauvegardes automatiques ;
 - tests fonctionnels couvrant les principaux modules et règles d’autorisation.
 
-La reprise complète des données de l’ancienne application et la validation sur l’hébergement cPanel cible ne sont pas encore finalisées.
+La reprise complète des données de l’ancienne application et la validation sur le serveur Debian cible ne sont pas encore finalisées.
 
 ## 14. Prochaines étapes recommandées
 
@@ -280,11 +280,11 @@ La reprise complète des données de l’ancienne application et la validation s
 5. tester une sauvegarde puis une restauration sur un environnement de recette isolé ;
 6. définir et exécuter la stratégie de reprise des données de l’ancienne application ;
 7. effectuer une revue de sécurité et vérifier la configuration de production ;
-8. déployer sur cPanel, contrôler les journaux et préparer un plan de retour arrière.
+8. déployer sur le serveur Debian, contrôler les journaux et préparer un plan de retour arrière.
 
 ## 15. Démarrage du socle Laravel
 
-Prérequis : PHP 8.3, Composer et les extensions demandées par Laravel.
+Prérequis : PHP 8.2, Composer et les extensions demandées par Laravel.
 
 ```bash
 composer install
@@ -296,72 +296,22 @@ php artisan serve
 
 Pour créer les rôles, les référentiels et le compte administrateur initial, configurez d’abord le SMTP dans `.env`, puis lancez `php artisan db:seed`. Le mot de passe temporaire est envoyé à l’adresse définie dans `AdminSeeder` et devra être changé à la première connexion. Le seeder ne réinitialise pas un administrateur déjà présent.
 
-Cette procédure démarre le socle RISFM local. Pour une installation sur cPanel, suivez la procédure de la section suivante et utilisez le modèle `.env.cpanel.example`.
+Cette procédure démarre le socle RISFM local. Pour la production, suivre le guide Debian et utiliser le modèle `.env.debian.example`.
 
-## 16. Installation en production sur cPanel
+## 16. Installation en production sur Debian
 
-Le fichier [`.env.cpanel.example`](.env.cpanel.example) est un modèle : il ne contient aucun secret réel. Il faut le copier vers `.env` sur le serveur, puis remplacer toutes les valeurs entre chevrons par celles fournies par cPanel et les services utilisés.
+La procédure complète se trouve dans [DEPLOIEMENT_DEBIAN.md](DEPLOIEMENT_DEBIAN.md). Le fichier [`.env.debian.example`](.env.debian.example) fournit les variables de production sans aucun secret réel.
 
-### Préparer l’hébergement
+Le déploiement Debian utilise :
 
-1. Choisir PHP 8.3 et activer les extensions requises par Composer et Laravel, notamment `pdo_mysql`, `mbstring`, `openssl`, `fileinfo`, `xml`, `ctype`, `curl`, `dom`, `gd` et `zip`.
-2. Créer une base MySQL et un utilisateur depuis cPanel, puis lui accorder les droits sur cette base. cPanel préfixe souvent leurs noms par le nom du compte.
-3. Déployer le code dans un répertoire privé, hors de `public_html`, et configurer le domaine pour que sa racine web pointe vers le dossier `public/` de Laravel. Le répertoire racine de l’application ne doit jamais être exposé publiquement.
-4. Installer les dépendances PHP de production :
+- Nginx et PHP-FPM 8.2 ou supérieur ;
+- MySQL ou MariaDB ;
+- Node.js 22 pour compiler les ressources ;
+- un service systemd permanent pour le worker Laravel ;
+- une tâche cron exécutant le scheduler chaque minute ;
+- HTTPS, SMTP et Pusher Channels.
 
-```bash
-composer install --no-dev --prefer-dist --optimize-autoloader
-```
-
-### Configurer l’application
-
-Depuis la racine du projet sur le serveur :
-
-```bash
-cp .env.cpanel.example .env
-php artisan key:generate
-```
-
-Modifier ensuite `.env` : renseigner le vrai domaine HTTPS, la base et l’utilisateur MySQL cPanel, le SMTP, ainsi que les identifiants Pusher. Garder `APP_ENV=production`, `APP_DEBUG=false` et `SESSION_ENCRYPT=true`. Ne jamais déposer le `.env` dans `public_html`, le committer ou transmettre ses secrets.
-
-Le SMTP doit être opérationnel avant le seeding : le compte administrateur initial reçoit son mot de passe temporaire par courriel. Vérifier aussi auprès de l’hébergeur le nom du serveur SMTP et le port/chiffrement attendus.
-
-Construire les ressources frontend avant le transfert ou sur un environnement Node compatible, puis déployer le répertoire `public/build/` généré :
-
-```bash
-npm ci
-npm run build
-```
-
-### Initialiser et optimiser
-
-Après avoir vérifié les paramètres et sauvegardé la base si elle contient déjà des données :
-
-```bash
-php artisan migrate --force
-php artisan db:seed --force
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-```
-
-Le seeder crée les rôles, référentiels et l’administrateur initial si nécessaire. Il n’est pas destiné à réinitialiser le mot de passe d’un compte existant. Vérifier que PHP peut écrire dans `storage/` et `bootstrap/cache/`.
-
-### Tâches planifiées et file d’attente
-
-Créer dans cPanel une tâche cron qui appelle `php artisan schedule:run` chaque minute. Exemple à adapter avec le chemin PHP et le chemin absolu du compte cPanel :
-
-```cron
-* * * * * /usr/local/bin/php /home/<COMPTE>/chemin-vers-projet/artisan schedule:run >> /dev/null 2>&1
-```
-
-Cette tâche déclenche notamment les relances de missions et les sauvegardes planifiées définies par l’application. Les imports et notifications utilisent aussi la file d’attente `database` : un worker doit donc être exécuté. Privilégier un gestionnaire de processus fourni par l’hébergeur. Si cPanel ne fournit qu’un cron, configurer un lancement sans chevauchement et vérifier que la commande `flock` est disponible ; adapter les chemins et la durée maximale au contrat d’hébergement :
-
-```cron
-* * * * * flock -n /home/<COMPTE>/chemin-vers-projet/storage/framework/risfm-queue.lock /usr/local/bin/php /home/<COMPTE>/chemin-vers-projet/artisan queue:work database --queue=imports,notifications,default --stop-when-empty --timeout=3600 --tries=3 >> /home/<COMPTE>/chemin-vers-projet/storage/logs/risfm-queue.log 2>&1
-```
-
-Après chaque modification du `.env`, reconstruire le cache de configuration avec `php artisan config:cache`. Consulter les journaux Laravel et les journaux de tâches cron après le déploiement, puis effectuer une recette avec des comptes et données de test avant l’ouverture aux utilisateurs.
+Le serveur Web doit pointer uniquement vers `/var/www/oipi-suivi-pi/public`. Le SMTP doit être opérationnel avant `php artisan db:seed`, car le mot de passe temporaire du premier administrateur est envoyé par courriel. Les instructions cPanel précédentes restent disponibles dans [DEPLOIEMENT_CPANEL.md](DEPLOIEMENT_CPANEL.md) mais ne constituent plus la procédure principale.
 
 ## Confidentialité
 
