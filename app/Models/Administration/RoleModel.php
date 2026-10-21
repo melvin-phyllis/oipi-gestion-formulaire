@@ -5,26 +5,26 @@ namespace App\Models\Administration;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Administration\RoleModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'role_code',
-    'role_name',
-    'description',
-    'is_system',
-    'is_active',
-])]
 final class RoleModel extends Model
 {
     /** @use HasFactory<RoleModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'adm_role_models';
+
+    protected $fillable = [
+        'role_code',
+        'role_name',
+        'description',
+        'is_system',
+        'is_active',
+    ];
 
     public function rolePermissions(): HasMany
     {

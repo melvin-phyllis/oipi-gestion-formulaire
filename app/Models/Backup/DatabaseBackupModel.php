@@ -6,28 +6,28 @@ use App\Enums\Backup\BackupType;
 use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'backup_type',
-    'disk',
-    'file_path',
-    'file_name',
-    'size_bytes',
-    'sha256',
-    'database_name',
-    'created_by_user_code_unique',
-    'creator_name',
-    'deleted_by_user_code_unique',
-])]
 final class DatabaseBackupModel extends Model
 {
     use HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'bkp_backup_models';
+
+    protected $fillable = [
+        'backup_type',
+        'disk',
+        'file_path',
+        'file_name',
+        'size_bytes',
+        'sha256',
+        'database_name',
+        'created_by_user_code_unique',
+        'creator_name',
+        'deleted_by_user_code_unique',
+    ];
 
     public function creator(): BelongsTo
     {

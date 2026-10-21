@@ -8,27 +8,27 @@ use App\Models\Registry\MissingFormModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Mission\FoundReportReviewModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'search_mission_code_unique',
-    'missing_form_code_unique',
-    'tracking_cycle',
-    'decision',
-    'rejection_reason',
-    'reviewed_by_user_code_unique',
-    'reviewed_at',
-])]
 final class FoundReportReviewModel extends Model
 {
     /** @use HasFactory<FoundReportReviewModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'mis_found_report_review_models';
+
+    protected $fillable = [
+        'search_mission_code_unique',
+        'missing_form_code_unique',
+        'tracking_cycle',
+        'decision',
+        'rejection_reason',
+        'reviewed_by_user_code_unique',
+        'reviewed_at',
+    ];
 
     public function mission(): BelongsTo
     {

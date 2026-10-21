@@ -5,27 +5,27 @@ namespace App\Models\Administration;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Administration\PermissionModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'permission_code',
-    'group_code',
-    'permission_name',
-    'description',
-    'is_system',
-    'is_active',
-])]
 final class PermissionModel extends Model
 {
     /** @use HasFactory<PermissionModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'adm_permission_models';
+
+    protected $fillable = [
+        'permission_code',
+        'group_code',
+        'permission_name',
+        'description',
+        'is_system',
+        'is_active',
+    ];
 
     public function rolePermissions(): HasMany
     {

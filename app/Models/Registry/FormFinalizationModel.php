@@ -7,26 +7,26 @@ use App\Models\Administration\UserModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Registry\FormFinalizationModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'missing_form_code_unique',
-    'tracking_cycle',
-    'step',
-    'performed_by_user_code_unique',
-    'performed_by_name',
-    'performed_at',
-])]
 final class FormFinalizationModel extends Model
 {
     /** @use HasFactory<FormFinalizationModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'reg_form_finalization_models';
+
+    protected $fillable = [
+        'missing_form_code_unique',
+        'tracking_cycle',
+        'step',
+        'performed_by_user_code_unique',
+        'performed_by_name',
+        'performed_at',
+    ];
 
     public function missingForm(): BelongsTo
     {

@@ -10,7 +10,7 @@ RISFM est un monolithe Laravel rendu côté serveur avec Blade et Tabler. Il ne 
 
 ## 2. Socle technique
 
-- PHP 8.3 ;
+- PHP 8.2 ;
 - version de Laravel définie par le `composer.lock` du projet ;
 - Blade et Tabler compilé localement avec Vite, sans CDN ;
 - authentification par session Laravel et protection CSRF ;

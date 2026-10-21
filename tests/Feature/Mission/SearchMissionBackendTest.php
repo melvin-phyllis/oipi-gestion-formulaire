@@ -49,11 +49,20 @@ final class SearchMissionBackendTest extends TestCase
     {
         parent::setUp();
 
+        CarbonImmutable::setTestNow('2026-10-15 08:00:00');
+
         $this->service = app(SearchMissionService::class);
         $this->assigner = UserModel::factory()->create();
         $this->responsible = UserModel::factory()->create();
         $this->location = SearchLocationModel::factory()->create();
         $this->form = MissingFormModel::factory()->create();
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_assignment_updates_the_form_and_prevents_an_active_duplicate(): void

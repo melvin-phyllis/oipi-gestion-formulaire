@@ -11,7 +11,6 @@ use App\Models\Registry\SearchLocationModel;
 use App\Traits\HasUniqueCode;
 use App\Traits\HasUuid;
 use Database\Factories\Mission\SearchMissionModelFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,31 +18,32 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable([
-    'parent_mission_code_unique',
-    'missing_form_code_unique',
-    'tracking_cycle',
-    'search_location_code_unique',
-    'responsible_user_code_unique',
-    'assigned_by_user_code_unique',
-    'closed_by_user_code_unique',
-    'status',
-    'result',
-    'result_summary',
-    'priority',
-    'assigned_at',
-    'due_date',
-    'searched_on',
-    'closed_at',
-    'cancellation_reason',
-    'active_assignment_key',
-])]
 final class SearchMissionModel extends Model
 {
     /** @use HasFactory<SearchMissionModelFactory> */
     use HasFactory, HasUniqueCode, HasUuid, SoftDeletes;
 
     protected $table = 'mis_search_mission_models';
+
+    protected $fillable = [
+        'parent_mission_code_unique',
+        'missing_form_code_unique',
+        'tracking_cycle',
+        'search_location_code_unique',
+        'responsible_user_code_unique',
+        'assigned_by_user_code_unique',
+        'closed_by_user_code_unique',
+        'status',
+        'result',
+        'result_summary',
+        'priority',
+        'assigned_at',
+        'due_date',
+        'searched_on',
+        'closed_at',
+        'cancellation_reason',
+        'active_assignment_key',
+    ];
 
     public function parentMission(): BelongsTo
     {
